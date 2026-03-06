@@ -28,3 +28,6 @@ Thumbs.db
 # Temporary
 *.tmp
 *.swp
+
+# Local git backup folders
+**/.git_backup_mono/
