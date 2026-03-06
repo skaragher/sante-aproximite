@@ -1,0 +1,359 @@
+import { useState } from "react";
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Switch,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
+import { apiFetch } from "../api/client";
+import { useAuth } from "../context/AuthContext";
+
+export function AuthScreen() {
+  const { login } = useAuth();
+  const [profileType, setProfileType] = useState("USER");
+  const [hasAccount, setHasAccount] = useState(true);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    phoneNumber: "",
+    role: "USER",
+    establishmentCode: ""
+  });
+  const [success, setSuccess] = useState("");
+
+  function normalizePhone(raw) {
+    return String(raw || "").replace(/\D/g, "").slice(0, 10);
+  }
+
+  async function submit() {
+    setError("");
+    setSuccess("");
+    setLoading(true);
+    try {
+      let path = "/auth/login";
+      let payload = {};
+
+      if (profileType === "USER") {
+        path = "/auth/mobile-user-session";
+        payload = {
+          fullName: hasAccount ? "" : form.fullName,
+          phoneNumber: normalizePhone(form.phoneNumber)
+        };
+      } else if (profileType === "EMERGENCY") {
+        path = "/auth/login";
+        payload = { email: form.email, password: form.password };
+      } else {
+        path = hasAccount ? "/auth/login" : "/auth/register";
+        payload =
+          hasAccount
+            ? { email: form.email, password: form.password }
+            : { ...form, role: "CHEF_ETABLISSEMENT" };
+      }
+
+      const data = await apiFetch(path, { method: "POST", body: payload });
+      if (data.pendingApproval) {
+        setSuccess(data.message || "Compte en attente de validation");
+        setForm({ fullName: "", email: "", password: "", phoneNumber: "", role: "USER", establishmentCode: "" });
+        return;
+      }
+      await login(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.hero}>
+            <View style={styles.heroBlobPrimary} />
+            <View style={styles.heroBlobSecondary} />
+            <Image source={require("../../assets/logo-sante.png")} style={styles.heroLogo} />
+            <Text style={styles.title}>Sante Aproximite</Text>
+            <Text style={styles.heroSubtitle}>Plateforme mobile de signalement et d'orientation sanitaire.</Text>
+            <View style={styles.heroBadgeRow}>
+              <Text style={styles.heroBadge}>Urgence 24/7</Text>
+              <Text style={styles.heroBadge}>Geolocalisation</Text>
+            </View>
+          </View>
+
+          <View style={styles.formCard}>
+            <View style={styles.roleRow}>
+              <Pressable
+                style={[styles.roleButton, profileType === "USER" && styles.roleButtonActive]}
+                onPress={() => {
+                  setProfileType("USER");
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                <Text style={[styles.roleText, profileType === "USER" && styles.roleTextActive]}>Utilisateur simple</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.roleButton, profileType === "CHEF_ETABLISSEMENT" && styles.roleButtonActive]}
+                onPress={() => {
+                  setProfileType("CHEF_ETABLISSEMENT");
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                <Text style={[styles.roleText, profileType === "CHEF_ETABLISSEMENT" && styles.roleTextActive]}>
+                  Chef d'etablissement
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.roleButton, profileType === "EMERGENCY" && styles.roleButtonActive]}
+                onPress={() => {
+                  setProfileType("EMERGENCY");
+                  setHasAccount(true);
+                  setError("");
+                  setSuccess("");
+                }}
+              >
+                <Text style={[styles.roleText, profileType === "EMERGENCY" && styles.roleTextActive]}>
+                  SAMU / Pompiers
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.subtitle}>
+              {profileType === "USER"
+                ? hasAccount
+                  ? "Utilisateur: connexion par numero"
+                  : "Utilisateur: creation de compte"
+                : profileType === "EMERGENCY"
+                  ? "SAMU/Pompiers: connexion securisee"
+                : hasAccount
+                  ? "Chef: connexion"
+                  : "Chef: inscription"}
+            </Text>
+            {profileType !== "EMERGENCY" ? (
+              <>
+                <Text style={styles.label}>Avez-vous deja un compte ?</Text>
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchLabel}>{hasAccount ? "Oui" : "Non"}</Text>
+                  <Switch
+                    value={hasAccount}
+                    onValueChange={(value) => {
+                      setHasAccount(value);
+                      setError("");
+                      setSuccess("");
+                    }}
+                    trackColor={{ false: "#fdd4bf", true: "#fdba74" }}
+                    thumbColor={hasAccount ? "#ea580c" : "#94a3b8"}
+                  />
+                </View>
+              </>
+            ) : null}
+
+            {profileType === "USER" && !hasAccount ? (
+              <TextInput
+                style={styles.input}
+                placeholder="Nom complet"
+                value={form.fullName}
+                onChangeText={(value) => setForm({ ...form, fullName: value })}
+              />
+            ) : null}
+
+            {profileType === "USER" ? (
+              <TextInput
+                style={styles.input}
+                placeholder="Numero de telephone"
+                keyboardType="number-pad"
+                value={form.phoneNumber}
+                onChangeText={(value) => setForm({ ...form, phoneNumber: normalizePhone(value) })}
+              />
+            ) : null}
+
+            {profileType === "CHEF_ETABLISSEMENT" ? (
+              <>
+                {!hasAccount ? (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nom complet"
+                    value={form.fullName}
+                    onChangeText={(value) => setForm({ ...form, fullName: value })}
+                  />
+                ) : null}
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={form.email}
+                  onChangeText={(value) => setForm({ ...form, email: value })}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Mot de passe"
+                  secureTextEntry
+                  value={form.password}
+                  onChangeText={(value) => setForm({ ...form, password: value })}
+                />
+                {!hasAccount ? (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Code de l'etablissement"
+                    autoCapitalize="characters"
+                    value={form.establishmentCode}
+                    onChangeText={(value) => setForm({ ...form, establishmentCode: value })}
+                  />
+                ) : null}
+              </>
+            ) : null}
+            {profileType === "EMERGENCY" ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email professionnel"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={form.email}
+                  onChangeText={(value) => setForm({ ...form, email: value })}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Mot de passe"
+                  secureTextEntry
+                  value={form.password}
+                  onChangeText={(value) => setForm({ ...form, password: value })}
+                />
+              </>
+            ) : null}
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {success ? <Text style={styles.success}>{success}</Text> : null}
+
+            <Pressable style={styles.primaryButton} onPress={submit} disabled={loading}>
+              <Text style={styles.primaryButtonText}>
+                {loading ? "Chargement..." : hasAccount ? "Se connecter" : "Creer le compte"}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  container: { flex: 1, backgroundColor: "#fff7ed" },
+  content: { padding: 20, paddingTop: 24, gap: 14, justifyContent: "center", flexGrow: 1 },
+  hero: {
+    position: "relative",
+    overflow: "hidden",
+    borderRadius: 18,
+    backgroundColor: "#1f2937",
+    borderColor: "#111827",
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: "center",
+    marginBottom: 4
+  },
+  heroBlobPrimary: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "#f97316",
+    top: -80,
+    right: -70,
+    opacity: 0.28
+  },
+  heroBlobSecondary: {
+    position: "absolute",
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "#fb923c",
+    bottom: -65,
+    left: -55,
+    opacity: 0.2
+  },
+  heroLogo: {
+    width: 68,
+    height: 68,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#fed7aa",
+    marginBottom: 8
+  },
+  title: { fontSize: 30, fontWeight: "800", color: "#ffffff" },
+  heroSubtitle: { color: "#fde68a", marginTop: 4, textAlign: "center", fontWeight: "600" },
+  heroBadgeRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  heroBadge: {
+    backgroundColor: "#111827",
+    borderColor: "#374151",
+    borderWidth: 1,
+    color: "#f9fafb",
+    fontSize: 12,
+    fontWeight: "700",
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10
+  },
+  formCard: {
+    backgroundColor: "#ffffff",
+    borderColor: "#fed7aa",
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12
+  },
+  subtitle: { color: "#7c2d12", marginBottom: 4, fontWeight: "600" },
+  label: { color: "#334155", fontWeight: "600" },
+  input: {
+    backgroundColor: "#fff",
+    borderColor: "#d0e3ec",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12
+  },
+  roleRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  roleButton: {
+    borderColor: "#fb923c",
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 7
+  },
+  roleButtonActive: { backgroundColor: "#f97316" },
+  roleText: { color: "#c2410c" },
+  roleTextActive: { color: "#fff" },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderColor: "#fed7aa",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#fff"
+  },
+  switchLabel: { color: "#0f172a", fontWeight: "600" },
+  primaryButton: {
+    backgroundColor: "#ea580c",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center"
+  },
+  primaryButtonText: { color: "#fff", fontWeight: "700" },
+  error: { color: "#b42318" },
+  success: { color: "#067647" }
+});

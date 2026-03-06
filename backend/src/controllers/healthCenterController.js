@@ -1,0 +1,1788 @@
+import { pool } from "../config/db.js";
+
+const ESTABLISHMENT_TYPES = ["CONFESSIONNEL", "PRIVE", "PUBLIQUE"];
+const CENTER_LEVELS = [
+  "CHU",
+  "CHR",
+  "CH",
+  "CHS",
+  "CLINIQUE_PRIVEE",
+  "CLCC",
+  "ESPC",
+  "CENTRE_SANTE",
+  "SSR",
+  "EHPAD_USLD",
+  "CENTRE_RADIOTHERAPIE",
+  "CENTRE_CARDIOLOGIE"
+];
+
+const CENTER_LEVEL_ALIASES = new Map([
+  ["CENTRE HOSPITALIER UNIVERSITAIRE", "CHU"],
+  ["CENTRE HOSPITALIER REGIONAL", "CHR"],
+  ["CENTRE HOSPITALIER", "CH"],
+  ["CENTRE HOSPITALIER SPECIALISE", "CHS"],
+  ["CLINIQUE PRIVEE", "CLINIQUE_PRIVEE"],
+  ["CENTRE DE LUTTE CONTRE LE CANCER", "CLCC"],
+  ["ESPC", "ESPC"],
+  ["ETABLISSEMENT SANITAIRE DE PREMIER CONTACT", "ESPC"],
+  ["CENTRE DE SANTE", "CENTRE_SANTE"],
+  ["CENTRES DE SANTE", "CENTRE_SANTE"],
+  ["SSR", "SSR"],
+  ["CENTRE DE READAPTATION", "SSR"],
+  ["EHPAD", "EHPAD_USLD"],
+  ["USLD", "EHPAD_USLD"],
+  ["EHPAD USLD", "EHPAD_USLD"],
+  ["CENTRE DE RADIOTHERAPIE", "CENTRE_RADIOTHERAPIE"],
+  ["CENTRE DE CARDIOLOGIE", "CENTRE_CARDIOLOGIE"]
+]);
+
+const ETABLISSEMENT_ROLES = new Set(["ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
+const ADMIN_ROLES = new Set(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"]);
+const COMPLAINT_VIEW_ROLES = new Set(["REGULATOR", "NATIONAL", "REGION", "DISTRICT", "ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
+
+function isEtablissementRole(role) {
+  return ETABLISSEMENT_ROLES.has(role);
+}
+
+function isAdminRole(role) {
+  return ADMIN_ROLES.has(role);
+}
+
+function normalizeGeoCode(value) {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim().toUpperCase();
+  return cleaned ? cleaned : null;
+}
+
+async function validateRegionDistrict(regionCode, districtCode, queryable = pool) {
+  if (!regionCode) {
+    return { ok: false, message: "regionCode est obligatoire" };
+  }
+
+  const regionResult = await queryable.query(
+    "SELECT code FROM regions WHERE code = $1 LIMIT 1",
+    [regionCode]
+  );
+  if (regionResult.rowCount === 0) {
+    return { ok: false, message: `Region introuvable: ${regionCode}` };
+  }
+
+  if (!districtCode) {
+    return { ok: true };
+  }
+
+  const districtResult = await queryable.query(
+    "SELECT code, region_code FROM districts WHERE code = $1 LIMIT 1",
+    [districtCode]
+  );
+  if (districtResult.rowCount === 0) {
+    return { ok: false, message: `District introuvable: ${districtCode}` };
+  }
+  const district = districtResult.rows[0];
+  if (String(district.region_code || "").toUpperCase() !== regionCode) {
+    return {
+      ok: false,
+      message: `Le district ${districtCode} n'appartient pas a la region ${regionCode}`
+    };
+  }
+  return { ok: true };
+}
+
+async function getRequesterScope(req) {
+  const role = String(req.user?.role || "").toUpperCase();
+  const userId = Number(req.user?.id);
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return {
+      role,
+      userId: null,
+      regionCode: null,
+      districtCode: null,
+      establishmentCode: null,
+      centerId: null
+    };
+  }
+
+  const found = await pool.query(
+    `
+      SELECT id, role, region_code, district_code, establishment_code, center_id
+      FROM users
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [userId]
+  );
+
+  if (found.rowCount === 0) {
+    return {
+      role,
+      userId,
+      regionCode: null,
+      districtCode: null,
+      establishmentCode: null,
+      centerId: null
+    };
+  }
+
+  const row = found.rows[0];
+  return {
+    role: String(row.role || role).toUpperCase(),
+    userId: Number(row.id),
+    regionCode: normalizeGeoCode(row.region_code),
+    districtCode: normalizeGeoCode(row.district_code),
+    establishmentCode: normalizeEstablishmentCode(row.establishment_code),
+    centerId: Number.isInteger(Number(row.center_id)) && Number(row.center_id) > 0 ? Number(row.center_id) : null
+  };
+}
+
+function applyCenterScope(whereParts, params, scope, centerAlias = "hc") {
+  if (scope.role === "ETABLISSEMENT" || scope.role === "CHEF_ETABLISSEMENT") {
+    if (scope.centerId) {
+      whereParts.push(`${centerAlias}.id = $${params.length + 1}`);
+      params.push(Number(scope.centerId));
+      return;
+    }
+    if (scope.establishmentCode) {
+      whereParts.push(`upper(${centerAlias}.establishment_code) = $${params.length + 1}`);
+      params.push(scope.establishmentCode);
+      return;
+    }
+    whereParts.push(`${centerAlias}.created_by = $${params.length + 1}`);
+    params.push(Number(scope.userId));
+    return;
+  }
+  if (scope.role === "DISTRICT") {
+    if (!scope.districtCode) {
+      whereParts.push("1 = 0");
+      return;
+    }
+    whereParts.push(`upper(${centerAlias}.district_code) = $${params.length + 1}`);
+    params.push(scope.districtCode);
+    return;
+  }
+  if (scope.role === "REGION") {
+    if (!scope.regionCode) {
+      whereParts.push("1 = 0");
+      return;
+    }
+    whereParts.push(`upper(${centerAlias}.region_code) = $${params.length + 1}`);
+    params.push(scope.regionCode);
+  }
+}
+
+async function canViewCenterByScope(scope, centerId) {
+  const centerResult = await pool.query(
+    `
+      SELECT id, created_by, region_code, district_code, establishment_code
+      FROM health_centers
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [centerId]
+  );
+  if (centerResult.rowCount === 0) {
+    return { exists: false, allowed: false };
+  }
+
+  const center = centerResult.rows[0];
+  if (scope.role === "REGULATOR" || scope.role === "NATIONAL") {
+    return { exists: true, allowed: true };
+  }
+  if (scope.role === "ETABLISSEMENT" || scope.role === "CHEF_ETABLISSEMENT") {
+    if (scope.centerId) {
+      return { exists: true, allowed: Number(center.id) === Number(scope.centerId) };
+    }
+    if (scope.establishmentCode) {
+      const centerCode = normalizeEstablishmentCode(center.establishment_code);
+      return { exists: true, allowed: !!centerCode && centerCode === scope.establishmentCode };
+    }
+    return { exists: true, allowed: String(center.created_by) === String(scope.userId) };
+  }
+  if (scope.role === "DISTRICT") {
+    const centerDistrict = normalizeGeoCode(center.district_code);
+    return { exists: true, allowed: !!scope.districtCode && centerDistrict === scope.districtCode };
+  }
+  if (scope.role === "REGION") {
+    const centerRegion = normalizeGeoCode(center.region_code);
+    return { exists: true, allowed: !!scope.regionCode && centerRegion === scope.regionCode };
+  }
+  return { exists: true, allowed: false };
+}
+
+function toNumber(value) {
+  const normalized =
+    typeof value === "string"
+      ? value.trim().replace(",", ".")
+      : value;
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+function stripDiacritics(value) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeEstablishmentType(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = stripDiacritics(value.trim()).toUpperCase();
+  return ESTABLISHMENT_TYPES.includes(normalized) ? normalized : null;
+}
+
+function normalizeEstablishmentCode(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase();
+  if (["N/A", "NA", "NULL", "NONE", "SANS CODE", "AUCUN", "-"].includes(normalized)) {
+    return null;
+  }
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeCenterLevel(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = stripDiacritics(value.trim())
+    .toUpperCase()
+    .replace(/[()]/g, " ")
+    .replace(/[/\\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (CENTER_LEVELS.includes(normalized)) {
+    return normalized;
+  }
+
+  if (CENTER_LEVEL_ALIASES.has(normalized)) {
+    return CENTER_LEVEL_ALIASES.get(normalized);
+  }
+
+  if (normalized.includes("CHU")) return "CHU";
+  if (normalized.includes("CHR")) return "CHR";
+  if (normalized === "CH" || normalized.includes(" CENTRE HOSPITALIER")) return "CH";
+  if (normalized.includes("CHS")) return "CHS";
+  if (normalized.includes("CLCC") || normalized.includes("LUTTE CONTRE LE CANCER")) return "CLCC";
+  if (normalized.includes("CLINIQUE")) return "CLINIQUE_PRIVEE";
+  if (normalized.includes("ESPC") || normalized.includes("PREMIER CONTACT")) return "ESPC";
+  if (normalized.includes("CENTRE DE SANTE")) return "CENTRE_SANTE";
+  if (normalized.includes("SSR") || normalized.includes("READAPTATION")) return "SSR";
+  if (normalized.includes("EHPAD") || normalized.includes("USLD")) return "EHPAD_USLD";
+  if (normalized.includes("RADIOTHERAPIE")) return "CENTRE_RADIOTHERAPIE";
+  if (normalized.includes("CARDIOLOGIE")) return "CENTRE_CARDIOLOGIE";
+
+  return null;
+}
+
+function mapCenterRow(row) {
+  const ratingAverage = row.rating_average == null ? null : Number(row.rating_average);
+  const ratingCount = row.rating_count == null ? 0 : Number(row.rating_count);
+  const satisfactionRate = row.satisfaction_rate == null ? null : Number(row.satisfaction_rate);
+
+  return {
+    _id: String(row.id),
+    name: row.name,
+    address: row.address,
+    establishmentCode: row.establishment_code,
+    level: row.level,
+    establishmentType: row.establishment_type,
+    technicalPlatform: row.technical_platform,
+    regionCode: row.region_code || null,
+    districtCode: row.district_code || null,
+    location: {
+      type: "Point",
+      coordinates: [Number(row.longitude), Number(row.latitude)]
+    },
+    createdBy: String(row.created_by),
+    approvalStatus: row.approval_status || "PENDING",
+    ratingAverage,
+    ratingCount,
+    satisfactionRate,
+    myRating: row.my_rating == null ? null : Number(row.my_rating),
+    mySatisfaction: row.my_satisfaction || null,
+    services: row.services || [],
+    ...(row.distance_km !== undefined ? { distanceKm: Number(row.distance_km) } : {})
+  };
+}
+
+function normalizeServices(services) {
+  if (typeof services === "string") {
+    return services
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((name) => ({ name }));
+  }
+
+  if (!Array.isArray(services)) {
+    return [];
+  }
+
+  return services
+    .map((service) => {
+      if (typeof service === "string") {
+        return { name: service.trim() };
+      }
+      return {
+        name: typeof service?.name === "string" ? service.name.trim() : "",
+        description: typeof service?.description === "string" ? service.description.trim() : null
+      };
+    })
+    .filter((service) => service.name.length > 0);
+}
+
+async function insertCenterWithServices(client, payload, createdBy, approvalStatus = "PENDING") {
+  const insertedCenter = await client.query(
+    `
+      INSERT INTO health_centers (
+        name,
+        address,
+        establishment_code,
+        level,
+        establishment_type,
+        technical_platform,
+        region_code,
+        district_code,
+        latitude,
+        longitude,
+        created_by,
+        approval_status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING id, name, address, establishment_code, level, establishment_type, technical_platform, region_code, district_code, latitude, longitude, created_by, approval_status;
+    `,
+    [
+      payload.name.trim(),
+      payload.address.trim(),
+      payload.establishmentCode,
+      payload.level.trim(),
+      payload.establishmentType,
+      payload.technicalPlatform.trim(),
+      payload.regionCode,
+      payload.districtCode,
+      payload.latitude,
+      payload.longitude,
+      createdBy,
+      approvalStatus
+    ]
+  );
+  const center = insertedCenter.rows[0];
+
+  const services = normalizeServices(payload.services);
+  for (const service of services) {
+    await client.query(
+      `
+        INSERT INTO health_center_services (center_id, name, description)
+        VALUES ($1, $2, $3);
+      `,
+      [center.id, service.name, service.description || null]
+    );
+  }
+
+  return mapCenterRow({
+    ...center,
+    services
+  });
+}
+
+export async function createCenter(req, res) {
+  const {
+    name,
+    address,
+    establishmentCode,
+    level,
+    establishmentType,
+    technicalPlatform,
+    services = [],
+    regionCode,
+    districtCode,
+    latitude,
+    longitude
+  } = req.body;
+
+  const lat = toNumber(latitude);
+  const lon = toNumber(longitude);
+  const normalizedCode = normalizeEstablishmentCode(establishmentCode);
+  const normalizedLevel = normalizeCenterLevel(level);
+  const normalizedType = normalizeEstablishmentType(establishmentType);
+  const normalizedRegionCode = normalizeGeoCode(regionCode);
+  const normalizedDistrictCode = normalizeGeoCode(districtCode);
+
+  if (level && !normalizedLevel) {
+    return res.status(400).json({
+      message:
+        "level invalide. Valeurs: CHU, CHR, CH, CHS, CLINIQUE_PRIVEE, CLCC, ESPC, CENTRE_SANTE, SSR, EHPAD_USLD, CENTRE_RADIOTHERAPIE, CENTRE_CARDIOLOGIE"
+    });
+  }
+
+  if (establishmentType && !normalizedType) {
+    return res.status(400).json({
+      message: "establishmentType invalide. Valeurs: CONFESSIONNEL, PRIVE, PUBLIQUE"
+    });
+  }
+
+  if (
+    !name ||
+    !address ||
+    !normalizedLevel ||
+    !normalizedType ||
+    !normalizedRegionCode ||
+    !technicalPlatform ||
+    lat === null ||
+    lon === null
+  ) {
+    return res.status(400).json({
+      message:
+        "name, address, regionCode, level, establishmentType, technicalPlatform, latitude et longitude sont obligatoires"
+    });
+  }
+
+  const requesterIsAdmin = isAdminRole(req.user?.role);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const geoValidation = await validateRegionDistrict(
+      normalizedRegionCode,
+      normalizedDistrictCode,
+      client
+    );
+    if (!geoValidation.ok) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: geoValidation.message });
+    }
+
+    if (!requesterIsAdmin) {
+      const existingCenter = await client.query(
+        `
+          SELECT id
+          FROM health_centers
+          WHERE created_by = $1
+          LIMIT 1;
+        `,
+        [Number(req.user.id)]
+      );
+      if (existingCenter.rowCount > 0) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          message: "Un chef ne peut creer qu'un seul centre. Utilisez la modification du centre."
+        });
+      }
+    }
+    const center = await insertCenterWithServices(
+      client,
+      {
+        name,
+        address,
+        establishmentCode: normalizedCode,
+        level: normalizedLevel,
+        establishmentType: normalizedType,
+        technicalPlatform,
+        regionCode: normalizedRegionCode,
+        districtCode: normalizedDistrictCode,
+        latitude: lat,
+        longitude: lon,
+        services
+      },
+      Number(req.user.id),
+      "PENDING"
+    );
+
+    await client.query("COMMIT");
+    return res.status(201).json(center);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function addService(req, res) {
+  const { id } = req.params;
+  const { name, description } = req.body;
+  const centerId = Number(id);
+
+  if (!name) {
+    return res.status(400).json({ message: "Le nom du service est obligatoire" });
+  }
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const centerResult = await pool.query(
+    `
+      SELECT id, created_by
+      FROM health_centers
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [centerId]
+  );
+
+  if (centerResult.rowCount === 0) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+
+  const center = centerResult.rows[0];
+  if (String(center.created_by) !== String(req.user.id)) {
+    return res.status(403).json({ message: "Vous ne pouvez modifier que vos centres" });
+  }
+
+  await pool.query(
+    `
+      INSERT INTO health_center_services (center_id, name, description)
+      VALUES ($1, $2, $3);
+    `,
+    [centerId, name.trim(), description?.trim() || null]
+  );
+
+  const fullResult = await pool.query(
+    `
+      SELECT
+        hc.id,
+        hc.name,
+        hc.address,
+        hc.establishment_code,
+        hc.level,
+        hc.establishment_type,
+        hc.technical_platform,
+        hc.latitude,
+        hc.longitude,
+        hc.created_by,
+        hc.approval_status,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object('name', s.name, 'description', s.description)
+            ORDER BY s.id
+          )
+          FROM health_center_services s
+          WHERE s.center_id = hc.id
+        ), '[]'::json) AS services
+      FROM health_centers hc
+      WHERE hc.id = $1;
+    `,
+    [centerId]
+  );
+
+  return res.json(mapCenterRow(fullResult.rows[0]));
+}
+
+export async function getNearbyCenters(req, res) {
+  const lat = toNumber(req.query.latitude);
+  const lon = toNumber(req.query.longitude);
+  const radiusKm = toNumber(req.query.radiusKm) ?? 30;
+  const viewerId = Number(req.user.id);
+  const scope = await getRequesterScope(req);
+
+  if (lat === null || lon === null) {
+    return res.status(400).json({ message: "latitude et longitude sont obligatoires" });
+  }
+
+  let filterClause = "WHERE cwd.distance_km <= $3";
+  const params = [lat, lon, radiusKm, viewerId];
+  const scopeParts = [];
+  applyCenterScope(scopeParts, params, scope, "cwd");
+  if (scopeParts.length) {
+    filterClause += ` AND ${scopeParts.join(" AND ")}`;
+  } else if (!isAdminRole(req.user.role) && !isEtablissementRole(req.user.role)) {
+    filterClause += " AND cwd.approval_status = 'APPROVED'";
+  }
+
+  const result = await pool.query(
+    `
+      WITH centers_with_distance AS (
+        SELECT
+          hc.id,
+          hc.name,
+          hc.address,
+          hc.establishment_code,
+          hc.level,
+          hc.establishment_type,
+          hc.technical_platform,
+          hc.region_code,
+          hc.district_code,
+          hc.latitude,
+          hc.longitude,
+          hc.created_by,
+          hc.approval_status,
+          (
+            6371 * acos(
+              LEAST(1, GREATEST(-1,
+                cos(radians($1)) * cos(radians(hc.latitude)) *
+                cos(radians(hc.longitude) - radians($2)) +
+                sin(radians($1)) * sin(radians(hc.latitude))
+              ))
+            )
+          ) AS distance_km
+        FROM health_centers hc
+      )
+      SELECT
+        cwd.id,
+        cwd.name,
+        cwd.address,
+        cwd.establishment_code,
+        cwd.level,
+        cwd.establishment_type,
+        cwd.technical_platform,
+        cwd.region_code,
+        cwd.district_code,
+        cwd.latitude,
+        cwd.longitude,
+        cwd.created_by,
+        cwd.approval_status,
+        ROUND(cwd.distance_km::numeric, 2) AS distance_km,
+        (
+          SELECT ROUND(AVG(cr.rating)::numeric, 1)
+          FROM center_ratings cr
+          WHERE cr.center_id = cwd.id AND cr.rating IS NOT NULL
+        ) AS rating_average,
+        (
+          SELECT COUNT(*)
+          FROM center_ratings cr
+          WHERE cr.center_id = cwd.id AND cr.rating IS NOT NULL
+        ) AS rating_count,
+        (
+          SELECT ROUND(
+            100.0 * SUM(CASE WHEN cr.satisfaction = 'SATISFIED' THEN 1 ELSE 0 END)
+            / NULLIF(COUNT(cr.satisfaction), 0),
+            1
+          )
+          FROM center_ratings cr
+          WHERE cr.center_id = cwd.id AND cr.satisfaction IS NOT NULL
+        ) AS satisfaction_rate,
+        (
+          SELECT cr.rating
+          FROM center_ratings cr
+          WHERE cr.center_id = cwd.id AND cr.user_id = $4
+          LIMIT 1
+        ) AS my_rating,
+        (
+          SELECT cr.satisfaction
+          FROM center_ratings cr
+          WHERE cr.center_id = cwd.id AND cr.user_id = $4
+          LIMIT 1
+        ) AS my_satisfaction,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object('name', s.name, 'description', s.description)
+            ORDER BY s.id
+          )
+          FROM health_center_services s
+          WHERE s.center_id = cwd.id
+        ), '[]'::json) AS services
+      FROM centers_with_distance cwd
+      ${filterClause}
+      ORDER BY cwd.distance_km ASC
+      LIMIT 600;
+    `,
+    params
+  );
+
+  return res.json(result.rows.map(mapCenterRow));
+}
+
+export async function getAllCenters(req, res) {
+  const viewerId = Number(req.user.id);
+  const scope = await getRequesterScope(req);
+  let whereClause = "";
+  const params = [viewerId];
+  const whereParts = [];
+  applyCenterScope(whereParts, params, scope, "hc");
+  if (whereParts.length) {
+    whereClause = `WHERE ${whereParts.join(" AND ")}`;
+  } else if (!isAdminRole(req.user.role) && !isEtablissementRole(req.user.role)) {
+    whereClause = "WHERE hc.approval_status = 'APPROVED'";
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        hc.id,
+        hc.name,
+        hc.address,
+        hc.establishment_code,
+        hc.level,
+        hc.establishment_type,
+        hc.technical_platform,
+        hc.region_code,
+        hc.district_code,
+        hc.latitude,
+        hc.longitude,
+        hc.created_by,
+        hc.approval_status,
+        (
+          SELECT ROUND(AVG(cr.rating)::numeric, 1)
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.rating IS NOT NULL
+        ) AS rating_average,
+        (
+          SELECT COUNT(*)
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.rating IS NOT NULL
+        ) AS rating_count,
+        (
+          SELECT ROUND(
+            100.0 * SUM(CASE WHEN cr.satisfaction = 'SATISFIED' THEN 1 ELSE 0 END)
+            / NULLIF(COUNT(cr.satisfaction), 0),
+            1
+          )
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.satisfaction IS NOT NULL
+        ) AS satisfaction_rate,
+        (
+          SELECT cr.rating
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.user_id = $1
+          LIMIT 1
+        ) AS my_rating,
+        (
+          SELECT cr.satisfaction
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.user_id = $1
+          LIMIT 1
+        ) AS my_satisfaction,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object('name', s.name, 'description', s.description)
+            ORDER BY s.id
+          )
+          FROM health_center_services s
+          WHERE s.center_id = hc.id
+        ), '[]'::json) AS services
+      FROM health_centers hc
+      ${whereClause}
+      ORDER BY hc.created_at DESC;
+    `,
+    params
+  );
+
+  return res.json(result.rows.map(mapCenterRow));
+}
+
+export async function importCenters(req, res) {
+  const payload = Array.isArray(req.body?.centers) ? req.body.centers : req.body;
+  const centers = Array.isArray(payload) ? payload : [];
+
+  if (centers.length === 0) {
+    return res.status(400).json({
+      message: "Envoyez un tableau de centres dans le body ou dans la cle 'centers'"
+    });
+  }
+
+  const normalizedCenters = [];
+  const errors = [];
+
+  centers.forEach((center, index) => {
+    const lat = toNumber(center?.latitude);
+    const lon = toNumber(center?.longitude);
+    const name = typeof center?.name === "string" ? center.name.trim() : "";
+    const addressRaw = typeof center?.address === "string" ? center.address.trim() : "";
+    const address = addressRaw || "Adresse non renseignee";
+    const rawCode = center?.establishmentCode ?? center?.codeEtablissement ?? center?.code;
+    const establishmentCode = normalizeEstablishmentCode(rawCode);
+    const level = typeof center?.level === "string" ? center.level.trim() : "";
+    const regionCode = normalizeGeoCode(center?.regionCode ?? center?.region ?? center?.region_code);
+    const districtCode = normalizeGeoCode(center?.districtCode ?? center?.district ?? center?.district_code);
+    const rawEstablishmentType =
+      center?.establishmentType ?? center?.typeEtablissement ?? center?.type;
+    const establishmentType = normalizeEstablishmentType(rawEstablishmentType);
+    const technicalPlatformRaw =
+      typeof center?.technicalPlatform === "string" ? center.technicalPlatform.trim() : "";
+    const technicalPlatform = technicalPlatformRaw || "Non renseigne";
+
+    const missingFields = [];
+    if (!name) missingFields.push("name");
+    if (!regionCode) missingFields.push("regionCode");
+    if (lat === null) missingFields.push("latitude");
+    if (lon === null) missingFields.push("longitude");
+
+    if (missingFields.length > 0) {
+      errors.push({
+        index,
+        message: `Champs obligatoires manquants: ${missingFields.join(", ")}`
+      });
+      return;
+    }
+
+    if (center?.level != null && !normalizeCenterLevel(center.level)) {
+      errors.push({
+        index,
+        message:
+          "level invalide. Valeurs: CHU, CHR, CH, CHS, CLINIQUE_PRIVEE, CLCC, ESPC, CENTRE_SANTE, SSR, EHPAD_USLD, CENTRE_RADIOTHERAPIE, CENTRE_CARDIOLOGIE"
+      });
+      return;
+    }
+
+    if (rawEstablishmentType != null && !establishmentType) {
+      errors.push({
+        index,
+        message: "establishmentType invalide. Valeurs: CONFESSIONNEL, PRIVE, PUBLIQUE"
+      });
+      return;
+    }
+
+    normalizedCenters.push({
+      name,
+      address,
+      establishmentCode,
+      level: normalizeCenterLevel(level) || "CENTRE_SANTE",
+      establishmentType: establishmentType || "PUBLIQUE",
+      technicalPlatform,
+      regionCode,
+      districtCode,
+      latitude: lat,
+      longitude: lon,
+      services: center.services ?? []
+    });
+  });
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      message: "Certaines lignes sont invalides",
+      errors
+    });
+  }
+
+  const allRegions = await pool.query("SELECT code FROM regions");
+  const regionSet = new Set(allRegions.rows.map((row) => String(row.code || "").toUpperCase()));
+  const allDistricts = await pool.query("SELECT code, region_code FROM districts");
+  const districtToRegion = new Map(
+    allDistricts.rows.map((row) => [
+      String(row.code || "").toUpperCase(),
+      String(row.region_code || "").toUpperCase()
+    ])
+  );
+
+  normalizedCenters.forEach((center, index) => {
+    const normalizedRegion = String(center.regionCode || "").toUpperCase();
+    if (!regionSet.has(normalizedRegion)) {
+      errors.push({ index, message: `Region introuvable: ${normalizedRegion}` });
+      return;
+    }
+
+    const normalizedDistrict = String(center.districtCode || "").toUpperCase();
+    if (!normalizedDistrict) return;
+    const districtRegion = districtToRegion.get(normalizedDistrict);
+    if (!districtRegion) {
+      errors.push({ index, message: `District introuvable: ${normalizedDistrict}` });
+      return;
+    }
+    if (districtRegion !== normalizedRegion) {
+      errors.push({
+        index,
+        message: `Le district ${normalizedDistrict} n'appartient pas a la region ${normalizedRegion}`
+      });
+    }
+  });
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      message: "Certaines lignes sont invalides",
+      errors
+    });
+  }
+
+  const client = await pool.connect();
+  const importedCenters = [];
+  try {
+    await client.query("BEGIN");
+    const importStatus = isAdminRole(req.user.role) ? "APPROVED" : "PENDING";
+
+    for (const center of normalizedCenters) {
+      const imported = await insertCenterWithServices(
+        client,
+        center,
+        Number(req.user.id),
+        importStatus
+      );
+      importedCenters.push(imported);
+    }
+
+    await client.query("COMMIT");
+    return res.status(201).json({
+      importedCount: importedCenters.length,
+      centers: importedCenters
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function createComplaintInternal(req, res, centerIdInput) {
+  if (isEtablissementRole(req.user.role)) {
+    return res.status(403).json({
+      message: "Un chef d'etablissement ne peut pas poser de plainte depuis son compte"
+    });
+  }
+
+  const centerId = centerIdInput == null ? null : Number(centerIdInput);
+  const hasCenter = centerId !== null;
+  const subject = typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+
+  if (hasCenter && (!Number.isInteger(centerId) || centerId <= 0)) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  if (!subject || !message) {
+    return res.status(400).json({ message: "subject et message sont obligatoires" });
+  }
+
+  if (hasCenter) {
+    const center = await pool.query("SELECT id FROM health_centers WHERE id = $1 LIMIT 1", [centerId]);
+    if (center.rowCount === 0) {
+      return res.status(404).json({ message: "Centre introuvable" });
+    }
+  }
+
+  const inserted = await pool.query(
+    `
+      INSERT INTO center_complaints (center_id, user_id, subject, message, status)
+      VALUES ($1, $2, $3, $4, 'NEW')
+      RETURNING id, center_id, user_id, subject, message, status, handled_by, handled_at, created_at;
+    `,
+    [hasCenter ? centerId : null, Number(req.user.id), subject, message]
+  );
+  await pool.query(
+    `
+      INSERT INTO complaint_updates (complaint_id, user_id, status, message)
+      VALUES ($1, $2, 'NEW', $3);
+    `,
+    [inserted.rows[0].id, Number(req.user.id), "Plainte enregistree"]
+  );
+
+  return res.status(201).json({
+    id: String(inserted.rows[0].id),
+    centerId: inserted.rows[0].center_id == null ? null : String(inserted.rows[0].center_id),
+    userId: String(inserted.rows[0].user_id),
+    subject: inserted.rows[0].subject,
+    message: inserted.rows[0].message,
+    status: inserted.rows[0].status,
+    handledBy: inserted.rows[0].handled_by == null ? null : String(inserted.rows[0].handled_by),
+    handledAt: inserted.rows[0].handled_at,
+    createdAt: inserted.rows[0].created_at
+  });
+}
+
+export async function updateCenter(req, res) {
+  const centerId = Number(req.params.id);
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const {
+    name,
+    address,
+    establishmentCode,
+    level,
+    establishmentType,
+    technicalPlatform,
+    services = [],
+    regionCode,
+    districtCode,
+    latitude,
+    longitude
+  } = req.body;
+
+  const lat = toNumber(latitude);
+  const lon = toNumber(longitude);
+  const normalizedCode = normalizeEstablishmentCode(establishmentCode);
+  const normalizedLevel = normalizeCenterLevel(level);
+  const normalizedType = normalizeEstablishmentType(establishmentType);
+  const normalizedRegionCode = normalizeGeoCode(regionCode);
+  const normalizedDistrictCode = normalizeGeoCode(districtCode);
+
+  if (!name || !address || !normalizedRegionCode || !technicalPlatform || lat === null || lon === null) {
+    return res.status(400).json({
+      message: "name, address, regionCode, technicalPlatform, latitude et longitude sont obligatoires"
+    });
+  }
+  if (!normalizedLevel || !normalizedType) {
+    return res.status(400).json({ message: "level ou establishmentType invalide" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const geoValidation = await validateRegionDistrict(
+      normalizedRegionCode,
+      normalizedDistrictCode,
+      client
+    );
+    if (!geoValidation.ok) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: geoValidation.message });
+    }
+
+    const owned = await client.query(
+      `
+        SELECT id
+        FROM health_centers
+        WHERE id = $1 AND created_by = $2
+        LIMIT 1;
+      `,
+      [centerId, Number(req.user.id)]
+    );
+    if (owned.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ message: "Vous ne pouvez modifier que votre centre" });
+    }
+
+    await client.query(
+      `
+        UPDATE health_centers
+        SET
+          name = $2,
+          address = $3,
+          establishment_code = $4,
+          level = $5,
+          establishment_type = $6,
+          technical_platform = $7,
+          region_code = $8,
+          district_code = $9,
+          latitude = $10,
+          longitude = $11,
+          approval_status = 'PENDING',
+          approved_by = NULL,
+          approved_at = NULL,
+          updated_at = NOW()
+        WHERE id = $1;
+      `,
+      [
+        centerId,
+        name.trim(),
+        address.trim(),
+        normalizedCode,
+        normalizedLevel,
+        normalizedType,
+        technicalPlatform.trim(),
+        normalizedRegionCode,
+        normalizedDistrictCode,
+        lat,
+        lon
+      ]
+    );
+
+    await client.query("DELETE FROM health_center_services WHERE center_id = $1", [centerId]);
+    const normalizedServices = normalizeServices(services);
+    for (const service of normalizedServices) {
+      await client.query(
+        `
+          INSERT INTO health_center_services (center_id, name, description)
+          VALUES ($1, $2, $3);
+        `,
+        [centerId, service.name, service.description || null]
+      );
+    }
+
+    const updated = await client.query(
+      `
+        SELECT
+          hc.id,
+          hc.name,
+          hc.address,
+          hc.establishment_code,
+          hc.level,
+          hc.establishment_type,
+          hc.technical_platform,
+          hc.region_code,
+          hc.district_code,
+          hc.latitude,
+          hc.longitude,
+          hc.created_by,
+          hc.approval_status,
+          COALESCE((
+            SELECT json_agg(
+              json_build_object('name', s.name, 'description', s.description)
+              ORDER BY s.id
+            )
+            FROM health_center_services s
+            WHERE s.center_id = hc.id
+          ), '[]'::json) AS services
+        FROM health_centers hc
+        WHERE hc.id = $1;
+      `,
+      [centerId]
+    );
+
+    await client.query("COMMIT");
+    return res.json(mapCenterRow(updated.rows[0]));
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function reviewCenter(req, res) {
+  const centerId = Number(req.params.id);
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const action = req.body?.action === "REJECT" ? "REJECT" : "APPROVE";
+  const status = action === "APPROVE" ? "APPROVED" : "REJECTED";
+
+  const updated = await pool.query(
+    `
+      UPDATE health_centers
+      SET
+        approval_status = $2,
+        approved_by = $3,
+        approved_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING
+        id,
+        name,
+        address,
+        establishment_code,
+        level,
+        establishment_type,
+        technical_platform,
+        region_code,
+        district_code,
+        latitude,
+        longitude,
+        created_by,
+        approval_status;
+    `,
+    [centerId, status, Number(req.user.id)]
+  );
+
+  if (updated.rowCount === 0) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+
+  return res.json(mapCenterRow({ ...updated.rows[0], services: [] }));
+}
+
+export async function listPendingCenters(req, res) {
+  const result = await pool.query(
+    `
+      SELECT
+        hc.id,
+        hc.name,
+        hc.address,
+        hc.establishment_code,
+        hc.level,
+        hc.establishment_type,
+        hc.technical_platform,
+        hc.region_code,
+        hc.district_code,
+        hc.latitude,
+        hc.longitude,
+        hc.created_by,
+        hc.approval_status,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object('name', s.name, 'description', s.description)
+            ORDER BY s.id
+          )
+          FROM health_center_services s
+          WHERE s.center_id = hc.id
+        ), '[]'::json) AS services
+      FROM health_centers hc
+      WHERE hc.approval_status = 'PENDING'
+      ORDER BY hc.created_at ASC;
+    `
+  );
+
+  return res.json(result.rows.map(mapCenterRow));
+}
+
+export async function deleteAllCenters(req, res) {
+  const confirmation = String(req.body?.confirm || "").trim();
+  if (confirmation !== "DELETE_ALL_CENTERS") {
+    return res.status(400).json({
+      message: "Confirmation requise: envoyez confirm=DELETE_ALL_CENTERS"
+    });
+  }
+
+  const deleted = await pool.query("DELETE FROM health_centers;");
+  return res.json({
+    message: "Tous les centres ont ete supprimes",
+    deletedCount: Number(deleted.rowCount || 0)
+  });
+}
+
+export async function rateCenter(req, res) {
+  if (isEtablissementRole(req.user.role)) {
+    return res.status(403).json({ message: "Un chef d'etablissement ne peut pas noter un centre" });
+  }
+
+  const centerId = Number(req.params.id);
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const rawRating = req.body?.rating;
+  const rating = rawRating == null || rawRating === "" ? null : Number(rawRating);
+  const rawSatisfaction =
+    typeof req.body?.satisfaction === "string" ? req.body.satisfaction.trim().toUpperCase() : "";
+  const satisfaction =
+    rawSatisfaction === "SATISFIED" || rawSatisfaction === "UNSATISFIED" ? rawSatisfaction : null;
+  const feedbackMessage =
+    typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message.trim() : null;
+
+  if (rating === null && satisfaction === null) {
+    return res.status(400).json({ message: "Fournissez une note (1-5) ou une satisfaction" });
+  }
+  if (rating !== null && (!Number.isInteger(rating) || rating < 1 || rating > 5)) {
+    return res.status(400).json({ message: "La note doit etre un entier entre 1 et 5" });
+  }
+
+  const center = await pool.query(
+    `SELECT id FROM health_centers WHERE id = $1 LIMIT 1`,
+    [centerId]
+  );
+  if (center.rowCount === 0) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+
+  await pool.query(
+    `
+      INSERT INTO center_ratings (center_id, user_id, rating, satisfaction, feedback_message)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (center_id, user_id)
+      DO UPDATE SET
+        rating = EXCLUDED.rating,
+        satisfaction = EXCLUDED.satisfaction,
+        feedback_message = EXCLUDED.feedback_message,
+        updated_at = NOW();
+    `,
+    [centerId, Number(req.user.id), rating, satisfaction, feedbackMessage]
+  );
+
+  const stats = await pool.query(
+    `
+      SELECT
+        (
+          SELECT ROUND(AVG(cr.rating)::numeric, 1)
+          FROM center_ratings cr
+          WHERE cr.center_id = $1 AND cr.rating IS NOT NULL
+        ) AS rating_average,
+        (
+          SELECT COUNT(*)
+          FROM center_ratings cr
+          WHERE cr.center_id = $1 AND cr.rating IS NOT NULL
+        ) AS rating_count,
+        (
+          SELECT ROUND(
+            100.0 * SUM(CASE WHEN cr.satisfaction = 'SATISFIED' THEN 1 ELSE 0 END)
+            / NULLIF(COUNT(cr.satisfaction), 0),
+            1
+          )
+          FROM center_ratings cr
+          WHERE cr.center_id = $1 AND cr.satisfaction IS NOT NULL
+        ) AS satisfaction_rate,
+        (
+          SELECT cr.rating
+          FROM center_ratings cr
+          WHERE cr.center_id = $1 AND cr.user_id = $2
+          LIMIT 1
+        ) AS my_rating,
+        (
+          SELECT cr.satisfaction
+          FROM center_ratings cr
+          WHERE cr.center_id = $1 AND cr.user_id = $2
+          LIMIT 1
+        ) AS my_satisfaction;
+    `,
+    [centerId, Number(req.user.id)]
+  );
+
+  const row = stats.rows[0];
+  return res.json({
+    centerId: String(centerId),
+    ratingAverage: row.rating_average == null ? null : Number(row.rating_average),
+    ratingCount: Number(row.rating_count || 0),
+    satisfactionRate: row.satisfaction_rate == null ? null : Number(row.satisfaction_rate),
+    myRating: row.my_rating == null ? null : Number(row.my_rating),
+    mySatisfaction: row.my_satisfaction || null
+  });
+}
+
+export async function createComplaint(req, res) {
+  return createComplaintInternal(req, res, req.params.id);
+}
+
+export async function createComplaintGeneric(req, res) {
+  const centerId = req.body?.centerId;
+  return createComplaintInternal(req, res, centerId == null || centerId === "" ? null : centerId);
+}
+
+export async function getCenterComplaints(req, res) {
+  if (!COMPLAINT_VIEW_ROLES.has(String(req.user?.role || "").toUpperCase())) {
+    return res.status(403).json({ message: "Acces refuse" });
+  }
+  const centerId = Number(req.params.id);
+
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const scope = await getRequesterScope(req);
+  const access = await canViewCenterByScope(scope, centerId);
+  if (!access.exists) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+  if (!access.allowed) {
+    return res.status(403).json({ message: "Acces refuse a ce centre" });
+  }
+
+  const complaints = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.center_id,
+        c.user_id,
+        c.subject,
+        c.message,
+        c.status,
+        c.handled_by,
+        c.handled_at,
+        c.created_at,
+        u.full_name AS user_full_name
+      FROM center_complaints c
+      INNER JOIN users u ON u.id = c.user_id
+      WHERE c.center_id = $1
+      ORDER BY c.created_at DESC;
+    `,
+    [centerId]
+  );
+
+  return res.json(
+    complaints.rows.map((row) => ({
+      id: String(row.id),
+      centerId: String(row.center_id),
+      userId: String(row.user_id),
+      userFullName: row.user_full_name,
+      subject: row.subject,
+      message: row.message,
+      status: row.status,
+      handledBy: row.handled_by == null ? null : String(row.handled_by),
+      handledAt: row.handled_at,
+      createdAt: row.created_at
+    }))
+  );
+}
+
+export async function getAllComplaints(req, res) {
+  if (!COMPLAINT_VIEW_ROLES.has(String(req.user?.role || "").toUpperCase())) {
+    return res.status(403).json({ message: "Acces refuse" });
+  }
+  const scope = await getRequesterScope(req);
+  const status = typeof req.query?.status === "string" ? req.query.status.trim().toUpperCase() : "";
+  const allowed = ["NEW", "IN_PROGRESS", "RESOLVED", "REJECTED"];
+  const whereParts = [];
+  const params = [];
+  if (allowed.includes(status)) {
+    whereParts.push(`c.status = $${params.length + 1}`);
+    params.push(status);
+  }
+  applyCenterScope(whereParts, params, scope, "hc");
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+  const result = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.center_id,
+        c.user_id,
+        c.subject,
+        c.message,
+        c.status,
+        c.handled_by,
+        c.handled_at,
+        c.created_at,
+        u.full_name AS user_full_name,
+        hc.name AS center_name,
+        hc.establishment_code AS center_code
+      FROM center_complaints c
+      INNER JOIN users u ON u.id = c.user_id
+      LEFT JOIN health_centers hc ON hc.id = c.center_id
+      ${whereClause}
+      ORDER BY
+        CASE c.status
+          WHEN 'NEW' THEN 1
+          WHEN 'IN_PROGRESS' THEN 2
+          WHEN 'REJECTED' THEN 3
+          ELSE 4
+        END,
+        c.created_at DESC;
+    `,
+    params
+  );
+
+  return res.json(
+    result.rows.map((row) => ({
+      id: String(row.id),
+      centerId: row.center_id == null ? null : String(row.center_id),
+      centerName: row.center_name || null,
+      centerCode: row.center_code || null,
+      userId: String(row.user_id),
+      userFullName: row.user_full_name,
+      subject: row.subject,
+      message: row.message,
+      status: row.status,
+      handledBy: row.handled_by == null ? null : String(row.handled_by),
+      handledAt: row.handled_at,
+      createdAt: row.created_at
+    }))
+  );
+}
+
+export async function getComplaintsSummary(req, res) {
+  if (!COMPLAINT_VIEW_ROLES.has(String(req.user?.role || "").toUpperCase())) {
+    return res.status(403).json({ message: "Acces refuse" });
+  }
+  const scope = await getRequesterScope(req);
+  const whereParts = [];
+  const params = [];
+  applyCenterScope(whereParts, params, scope, "hc");
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+  const complaintsAgg = await pool.query(
+    `
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE c.status = 'NEW')::int AS new_count,
+        COUNT(*) FILTER (WHERE c.status = 'IN_PROGRESS')::int AS in_progress_count,
+        COUNT(*) FILTER (WHERE c.status = 'RESOLVED')::int AS resolved_count,
+        COUNT(*) FILTER (WHERE c.status = 'REJECTED')::int AS rejected_count
+      FROM center_complaints c
+      LEFT JOIN health_centers hc ON hc.id = c.center_id
+      ${whereClause};
+    `,
+    params
+  );
+
+  const aggregateByAllScopedCenters = ["DISTRICT", "REGION", "NATIONAL", "REGULATOR"].includes(scope.role);
+  const ratingsAgg = aggregateByAllScopedCenters
+    ? await pool.query(
+        `
+          WITH centers_scope AS (
+            SELECT hc.id
+            FROM health_centers hc
+            ${whereClause}
+          ),
+          per_center AS (
+            SELECT
+              cs.id AS center_id,
+              ROUND(AVG(cr.rating)::numeric, 1) AS center_rating_average,
+              ROUND(
+                100.0 * SUM(CASE WHEN cr.satisfaction = 'SATISFIED' THEN 1 ELSE 0 END)
+                / NULLIF(COUNT(cr.satisfaction), 0),
+                1
+              ) AS center_satisfaction_rate,
+              COUNT(cr.rating)::int AS center_rating_count
+            FROM centers_scope cs
+            LEFT JOIN center_ratings cr ON cr.center_id = cs.id
+            GROUP BY cs.id
+          ),
+          totals AS (
+            SELECT
+              COUNT(cr.rating)::int AS rating_count,
+              COUNT(DISTINCT cs.id)::int AS center_count,
+              COUNT(DISTINCT cs.id) FILTER (
+                WHERE NOT EXISTS (
+                  SELECT 1
+                  FROM center_ratings cr2
+                  WHERE cr2.center_id = cs.id
+                )
+              )::int AS centers_without_evaluation
+            FROM centers_scope cs
+            LEFT JOIN center_ratings cr ON cr.center_id = cs.id
+          )
+          SELECT
+            ROUND(AVG(COALESCE(pc.center_rating_average, 0))::numeric, 1) AS rating_average,
+            MAX(t.rating_count) AS rating_count,
+            ROUND(AVG(COALESCE(pc.center_satisfaction_rate, 0))::numeric, 1) AS satisfaction_rate,
+            MAX(t.centers_without_evaluation) AS centers_without_evaluation
+          FROM per_center pc
+          CROSS JOIN totals t;
+        `,
+        params
+      )
+    : await pool.query(
+        `
+          SELECT
+            ROUND(AVG(cr.rating)::numeric, 1) AS rating_average,
+            COUNT(cr.rating)::int AS rating_count,
+            ROUND(
+              100.0 * SUM(CASE WHEN cr.satisfaction = 'SATISFIED' THEN 1 ELSE 0 END)
+              / NULLIF(COUNT(cr.satisfaction), 0),
+              1
+            ) AS satisfaction_rate,
+            COUNT(DISTINCT hc.id) FILTER (
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM center_ratings cr2
+                WHERE cr2.center_id = hc.id
+              )
+            )::int AS centers_without_evaluation
+          FROM center_ratings cr
+          JOIN health_centers hc ON hc.id = cr.center_id
+          ${whereClause};
+        `,
+        params
+      );
+
+  const centersAgg = await pool.query(
+    `
+      SELECT
+        COUNT(*)::int AS center_count
+      FROM health_centers hc
+      ${whereClause};
+    `,
+    params
+  );
+
+  const scopeLabel =
+    scope.role === "DISTRICT"
+      ? "DISTRICT"
+      : scope.role === "REGION"
+        ? "REGION"
+        : scope.role === "ETABLISSEMENT" || scope.role === "CHEF_ETABLISSEMENT"
+          ? "CENTER"
+          : "NATIONAL";
+
+  const c = complaintsAgg.rows[0] || {};
+  const r = ratingsAgg.rows[0] || {};
+  const centerCount = Number(centersAgg.rows[0]?.center_count || 0);
+
+  return res.json({
+    scope: scopeLabel,
+    regionCode: scope.regionCode || null,
+    districtCode: scope.districtCode || null,
+    centerCount,
+    complaints: {
+      total: Number(c.total || 0),
+      newCount: Number(c.new_count || 0),
+      inProgressCount: Number(c.in_progress_count || 0),
+      resolvedCount: Number(c.resolved_count || 0),
+      rejectedCount: Number(c.rejected_count || 0)
+    },
+    ratingAverage: r.rating_average == null ? null : Number(r.rating_average),
+    ratingCount: Number(r.rating_count || 0),
+    satisfactionRate: r.satisfaction_rate == null ? null : Number(r.satisfaction_rate),
+    centersWithoutEvaluation: Number(r.centers_without_evaluation || 0)
+  });
+}
+
+export async function updateComplaintStatus(req, res) {
+  const complaintId = Number(req.params.id);
+  const requested = typeof req.body?.status === "string" ? req.body.status.trim().toUpperCase() : "";
+  const nextStatus = ["IN_PROGRESS", "RESOLVED", "REJECTED"].includes(requested)
+    ? requested
+    : "IN_PROGRESS";
+
+  if (!Number.isInteger(complaintId) || complaintId <= 0) {
+    return res.status(400).json({ message: "ID de plainte invalide" });
+  }
+
+  const updated = await pool.query(
+    `
+      UPDATE center_complaints
+      SET
+        status = $2,
+        handled_by = $3,
+        handled_at = NOW()
+      WHERE id = $1
+      RETURNING id, center_id, user_id, subject, message, status, handled_by, handled_at, created_at;
+    `,
+    [complaintId, nextStatus, Number(req.user.id)]
+  );
+
+  if (updated.rowCount === 0) {
+    return res.status(404).json({ message: "Plainte introuvable" });
+  }
+
+  const updateMessage =
+    nextStatus === "IN_PROGRESS"
+      ? "Votre plainte est prise en charge"
+      : nextStatus === "RESOLVED"
+        ? "Votre plainte est marquee resolue"
+        : "Votre plainte a ete rejetee";
+  const customMessage =
+    typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message.trim() : updateMessage;
+
+  await pool.query(
+    `
+      INSERT INTO complaint_updates (complaint_id, user_id, status, message)
+      VALUES ($1, $2, $3, $4);
+    `,
+    [complaintId, Number(req.user.id), nextStatus, customMessage]
+  );
+
+  const row = updated.rows[0];
+  return res.json({
+    id: String(row.id),
+    centerId: row.center_id == null ? null : String(row.center_id),
+    userId: String(row.user_id),
+    subject: row.subject,
+    message: row.message,
+    status: row.status,
+    handledBy: row.handled_by == null ? null : String(row.handled_by),
+    handledAt: row.handled_at,
+    createdAt: row.created_at
+  });
+}
+
+export async function submitComplaintFeedback(req, res) {
+  const complaintId = Number(req.params.id);
+  if (!Number.isInteger(complaintId) || complaintId <= 0) {
+    return res.status(400).json({ message: "ID de plainte invalide" });
+  }
+
+  const rawStatus = typeof req.body?.status === "string" ? req.body.status.trim().toUpperCase() : "";
+  if (!["SATISFIED", "UNSATISFIED"].includes(rawStatus)) {
+    return res.status(400).json({ message: "status doit etre SATISFIED ou UNSATISFIED" });
+  }
+  const feedbackMessage =
+    typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message.trim() : null;
+
+  const found = await pool.query(
+    `
+      SELECT id, user_id, status
+      FROM center_complaints
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [complaintId]
+  );
+  if (found.rowCount === 0) {
+    return res.status(404).json({ message: "Plainte introuvable" });
+  }
+
+  const complaint = found.rows[0];
+  if (String(complaint.user_id) !== String(req.user.id)) {
+    return res.status(403).json({ message: "Vous ne pouvez valider que vos propres plaintes" });
+  }
+  if (!["RESOLVED", "REJECTED"].includes(complaint.status)) {
+    return res.status(400).json({ message: "La plainte n'est pas encore traitee" });
+  }
+
+  const updated = await pool.query(
+    `
+      UPDATE center_complaints
+      SET
+        user_feedback_status = $2,
+        user_feedback_message = $3,
+        user_feedback_at = NOW()
+      WHERE id = $1
+      RETURNING
+        id,
+        center_id,
+        user_id,
+        subject,
+        message,
+        status,
+        handled_by,
+        handled_at,
+        user_feedback_status,
+        user_feedback_message,
+        user_feedback_at,
+        created_at;
+    `,
+    [complaintId, rawStatus, feedbackMessage]
+  );
+
+  await pool.query(
+    `
+      INSERT INTO complaint_updates (complaint_id, user_id, status, message)
+      VALUES ($1, $2, $3, $4);
+    `,
+    [
+      complaintId,
+      Number(req.user.id),
+      complaint.status,
+      rawStatus === "SATISFIED"
+        ? "Usager satisfait du traitement de la plainte"
+        : "Usager insatisfait du traitement de la plainte"
+    ]
+  );
+
+  const row = updated.rows[0];
+  return res.json({
+    id: String(row.id),
+    centerId: row.center_id == null ? null : String(row.center_id),
+    userId: String(row.user_id),
+    subject: row.subject,
+    message: row.message,
+    status: row.status,
+    handledBy: row.handled_by == null ? null : String(row.handled_by),
+    handledAt: row.handled_at,
+    userFeedbackStatus: row.user_feedback_status || null,
+    userFeedbackMessage: row.user_feedback_message || null,
+    userFeedbackAt: row.user_feedback_at || null,
+    createdAt: row.created_at
+  });
+}
+
+export async function getMyComplaints(req, res) {
+  const result = await pool.query(
+    `
+      SELECT
+        c.id,
+        c.center_id,
+        c.user_id,
+        c.subject,
+        c.message,
+        c.status,
+        c.handled_by,
+        c.handled_at,
+        c.user_feedback_status,
+        c.user_feedback_message,
+        c.user_feedback_at,
+        c.created_at,
+        hc.name AS center_name,
+        hc.establishment_code AS center_code,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', u.id,
+              'status', u.status,
+              'message', u.message,
+              'createdAt', u.created_at
+            )
+            ORDER BY u.created_at ASC
+          )
+          FROM complaint_updates u
+          WHERE u.complaint_id = c.id
+        ), '[]'::json) AS updates
+      FROM center_complaints c
+      LEFT JOIN health_centers hc ON hc.id = c.center_id
+      WHERE c.user_id = $1
+      ORDER BY c.created_at DESC;
+    `,
+    [Number(req.user.id)]
+  );
+
+  return res.json(
+    result.rows.map((row) => ({
+      id: String(row.id),
+      centerId: row.center_id == null ? null : String(row.center_id),
+      centerName: row.center_name || null,
+      centerCode: row.center_code || null,
+      userId: String(row.user_id),
+      subject: row.subject,
+      message: row.message,
+      status: row.status,
+      handledBy: row.handled_by == null ? null : String(row.handled_by),
+      handledAt: row.handled_at,
+      userFeedbackStatus: row.user_feedback_status || null,
+      userFeedbackMessage: row.user_feedback_message || null,
+      userFeedbackAt: row.user_feedback_at || null,
+      createdAt: row.created_at,
+      updates: row.updates || []
+    }))
+  );
+}
+
