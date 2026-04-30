@@ -7,6 +7,7 @@ import userRoutes from "./routes/userRoutes.js";
 import emergencyRoutes from "./routes/emergencyRoutes.js";
 import geoRoutes from "./routes/geoRoutes.js";
 import securityAlertRoutes from "./routes/securityAlertRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 export const app = express();
@@ -28,5 +29,6 @@ app.use("/api/users", userRoutes);
 app.use("/api/emergency-reports", emergencyRoutes);
 app.use("/api/geo", geoRoutes);
 app.use("/api/security-alerts", securityAlertRoutes);
+app.use("/api/contact", contactRoutes);
 
 app.use(errorHandler);

@@ -4,6 +4,7 @@ import { apiFetch, getPendingRequestsCount, syncPendingRequests } from "./api/cl
 import { useAuth } from "./context/AuthContext";
 import { C, S } from "./theme";
 import { AuthScreen } from "./screens/AuthScreen";
+import { ProjectDigitalizationModal } from "./components/ProjectDigitalizationModal";
 
 const MODULE_ICONS = {
   centers:   { uri: "https://img.icons8.com/color/96/hospital-3.png" },
@@ -14,6 +15,8 @@ const MODULE_ICONS = {
   emergency: { uri: "https://img.icons8.com/color/96/ambulance.png" },
   security:  { uri: "https://img.icons8.com/color/96/police-badge.png" },
   settings:  { uri: "https://img.icons8.com/color/96/settings.png" },
+  developer: { uri: "https://img.icons8.com/color/96/filled-topic.png" },
+  project:   { uri: "https://img.icons8.com/color/96/rocket--v1.png" },
 };
 
 const MODULE_COLORS = {
@@ -32,6 +35,8 @@ export function Root() {
   const { user, token, ready, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState("nearby");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [supportActionsOpen, setSupportActionsOpen] = useState(false);
   const [chefCenterApprovalStatus, setChefCenterApprovalStatus] = useState(null);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [syncNotice, setSyncNotice] = useState(null);
@@ -200,6 +205,10 @@ export function Root() {
       const { CenterSettingsScreen } = require("./screens/CenterSettingsScreen");
       return <CenterSettingsScreen />;
     }
+    if (currentTab === "contact_developer") {
+      const { ContactDeveloperScreen } = require("./screens/ContactDeveloperScreen");
+      return <ContactDeveloperScreen />;
+    }
     return null;
   }
 
@@ -216,6 +225,7 @@ export function Root() {
   ];
 
   const activeTab = tabs.find((t) => t.key === currentTab);
+  const supportCardActive = currentTab === "contact_developer" || projectModalOpen || supportActionsOpen;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -283,9 +293,65 @@ export function Root() {
                   </Pressable>
                 );
               })}
+
+              <Pressable
+                style={[styles.moduleCard, supportCardActive && { borderColor: C.amber, borderWidth: 2 }]}
+                onPress={() => setSupportActionsOpen((value) => !value)}
+              >
+                {supportCardActive ? <View style={[styles.moduleCardActiveBar, { backgroundColor: C.amber }]} /> : null}
+                <Image source={MODULE_ICONS.developer} style={styles.moduleCardIcon} />
+                <Text style={[styles.moduleCardText, supportCardActive && { color: C.amber }]}>Support & projet</Text>
+              </Pressable>
             </View>
 
-            <View style={styles.drawerDivider} />
+            {supportActionsOpen ? (
+              <>
+                <View style={styles.drawerDivider} />
+
+                <View style={styles.supportModuleCard}>
+                  <View style={styles.supportModuleHeader}>
+                    <Text style={styles.supportModuleTitle}>Support & projet</Text>
+                    <Text style={styles.supportModuleHint}>Choisissez l’action que vous voulez lancer</Text>
+                  </View>
+
+                  <View style={styles.supportModuleBody}>
+                    <Pressable
+                      style={[styles.supportActionBtn, styles.supportActionBtnYellow]}
+                      onPress={() => {
+                        setCurrentTab("contact_developer");
+                        setSupportActionsOpen(false);
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <Image source={MODULE_ICONS.developer} style={styles.supportActionIcon} />
+                      <View style={styles.supportActionTextWrap}>
+                        <Text style={styles.supportActionTitleDark}>Contacter le developpeur</Text>
+                        <Text style={styles.supportActionSubDark}>Message direct a YEFA Technologie</Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      style={[styles.supportActionBtn, styles.supportActionBtnRed]}
+                      onPress={() => {
+                        setSupportActionsOpen(false);
+                        setMenuOpen(false);
+                        setProjectModalOpen(true);
+                      }}
+                    >
+                      <Image source={MODULE_ICONS.project} style={styles.supportActionIcon} />
+                      <View style={styles.supportActionTextWrap}>
+                        <Text style={styles.supportActionTitleLight}>Vous avez un projet de digitalisation ?</Text>
+                        <Text style={styles.supportActionSubLight}>Cliquez ici et parlez-en a YEFA</Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={styles.drawerDivider} />
+              </>
+            ) : (
+              <View style={styles.drawerDivider} />
+            )}
 
             <Pressable
               style={styles.logoutBtn}
@@ -296,6 +362,8 @@ export function Root() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <ProjectDigitalizationModal visible={projectModalOpen} onClose={() => setProjectModalOpen(false)} />
 
       {/* Content */}
       <View style={styles.content}>
@@ -437,6 +505,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
+  supportModuleCard: {
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+    ...S.sm,
+  },
+  supportModuleHeader: { gap: 4 },
+  supportModuleTitle: {
+    color: C.textDark,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  supportModuleHint: {
+    color: C.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  supportModuleBody: {
+    gap: 10,
+  },
+  supportActionBtn: {
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    ...S.sm,
+  },
+  supportActionBtnYellow: {
+    backgroundColor: "#FACC15",
+  },
+  supportActionBtnRed: {
+    backgroundColor: "#DC2626",
+  },
+  supportActionIcon: { width: 28, height: 28 },
+  supportActionTextWrap: { flex: 1, minWidth: 0 },
+  supportActionTitleDark: { color: "#1F2937", fontWeight: "900", fontSize: 16 },
+  supportActionSubDark: { color: "#4B5563", fontSize: 12, marginTop: 3, fontWeight: "600" },
+  supportActionTitleLight: { color: "#FFFFFF", fontWeight: "900", fontSize: 15 },
+  supportActionSubLight: { color: "rgba(255,255,255,0.88)", fontSize: 12, marginTop: 3, fontWeight: "600" },
 
   logoutBtn: {
     backgroundColor: C.redLight,
