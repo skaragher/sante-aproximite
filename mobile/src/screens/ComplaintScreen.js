@@ -62,18 +62,21 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
 
   async function loadData({ silent = false } = {}) {
     try {
+      if (!silent) setError("");
       const catalog = await loadCenterCatalog(token);
       setCenters(Array.isArray(catalog?.centers) ? catalog.centers : []);
-      let complaintData = [];
-      try {
-        complaintData = await apiFetch("/complaints/mine", { token });
-      } catch (err) {
-        if (!silent) setError(err.message);
-      }
       const queue = await getPendingRequests();
       const offlineComplaints = queue
         .filter((item) => item?.path === "/complaints" && String(item?.method || "").toUpperCase() === "POST")
         .map((item) => toOfflineComplaint(item, catalog?.centers || []));
+      let complaintData = [];
+      try {
+        complaintData = await apiFetch("/complaints/mine", { token });
+      } catch (err) {
+        if (!silent && offlineComplaints.length === 0) {
+          setError(err.message);
+        }
+      }
       setMyComplaints([...(Array.isArray(complaintData) ? complaintData : []), ...offlineComplaints]);
       syncCenterCatalog(token)
         .then((nextCatalog) => setCenters(Array.isArray(nextCatalog?.centers) ? nextCatalog.centers : []))
@@ -102,6 +105,7 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
   const activeComplaints   = myComplaints.filter((item) => !["RESOLVED", "REJECTED"].includes(item.status));
   const resolvedComplaints = myComplaints.filter((item) =>  ["RESOLVED", "REJECTED"].includes(item.status));
   const displayedComplaints = historyTab === "RESOLVED" ? resolvedComplaints : activeComplaints;
+  const selectedSubjectPreset = QUICK_SUBJECTS.includes(subject) ? subject : "";
 
   async function submitComplaint() {
     setError("");
@@ -177,36 +181,57 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
         <>
           <View style={styles.header}>
             <Text style={styles.title}>Poser une plainte</Text>
-            <Text style={styles.subtitle}>Decrivez votre experience pour ameliorer les services de sante.</Text>
+            <Text style={styles.subtitle}>Choisissez un type, decrivez la situation et l'application s'occupe du reste, meme hors ligne.</Text>
           </View>
 
-          {/* Type selector */}
-          <View style={styles.modeRow}>
-            <Pressable
-              style={[styles.modeBtn, complaintType === "WITH_CENTER" && styles.modeBtnActive]}
-              onPress={() => setComplaintType("WITH_CENTER")}
-            >
-              <Text style={[styles.modeBtnText, complaintType === "WITH_CENTER" && styles.modeBtnTextActive]}>
-                Avec un centre
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.modeBtn, complaintType === "GENERAL" && styles.modeBtnActive]}
-              onPress={() => setComplaintType("GENERAL")}
-            >
-              <Text style={[styles.modeBtnText, complaintType === "GENERAL" && styles.modeBtnTextActive]}>
-                Plainte generale
-              </Text>
-            </Pressable>
+          <View style={styles.heroCard}>
+            <View style={styles.heroRow}>
+              <View style={styles.heroIcon}>
+                <Text style={styles.heroIconText}>!</Text>
+              </View>
+              <View style={styles.heroTextWrap}>
+                <Text style={styles.heroTitle}>Signalement rapide</Text>
+                <Text style={styles.heroSubtitle}>Votre message est enregistre et synchronise automatiquement.</Text>
+              </View>
+            </View>
+
+            <View style={styles.modeGrid}>
+              <Pressable
+                style={[styles.modeCard, complaintType === "WITH_CENTER" && styles.modeCardActive]}
+                onPress={() => setComplaintType("WITH_CENTER")}
+              >
+                <Text style={styles.modeEmoji}>🏥</Text>
+                <Text style={[styles.modeCardTitle, complaintType === "WITH_CENTER" && styles.modeCardTitleActive]}>
+                  Centre cible
+                </Text>
+                <Text style={[styles.modeCardDesc, complaintType === "WITH_CENTER" && styles.modeCardDescActive]}>
+                  Liee a un etablissement precis
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modeCard, complaintType === "GENERAL" && styles.modeCardActive]}
+                onPress={() => setComplaintType("GENERAL")}
+              >
+                <Text style={styles.modeEmoji}>📝</Text>
+                <Text style={[styles.modeCardTitle, complaintType === "GENERAL" && styles.modeCardTitleActive]}>
+                  Generale
+                </Text>
+                <Text style={[styles.modeCardDesc, complaintType === "GENERAL" && styles.modeCardDescActive]}>
+                  Remontee globale sur le service
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
-          {/* Center selection */}
           {needsCenter ? (
             <View style={styles.sectionCard}>
-              <Text style={styles.sectionLabel}>CENTRE DE SANTE</Text>
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>Selection du centre</Text>
+                <Text style={styles.sectionCaption}>Cherchez puis touchez un centre.</Text>
+              </View>
               <TextInput
                 style={styles.input}
-                placeholder="Rechercher un centre..."
+                placeholder="Nom du centre ou adresse..."
                 placeholderTextColor={C.textLight}
                 value={search}
                 onChangeText={setSearch}
@@ -214,6 +239,7 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
               {selectedCenter ? (
                 <View style={styles.selectedCenterBox}>
                   <View style={styles.selectedCenterInfo}>
+                    <Text style={styles.selectedCenterTag}>Centre selectionne</Text>
                     <Text style={styles.selectedCenterName}>{selectedCenter.name}</Text>
                     <Text style={styles.selectedCenterAddr}>{selectedCenter.address}</Text>
                   </View>
@@ -222,40 +248,69 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
                   </Pressable>
                 </View>
               ) : (
-                <View style={styles.centerList}>
-                  {filteredCenters.map((center) => (
-                    <Pressable
-                      key={center._id}
-                      style={styles.centerListItem}
-                      onPress={() => setSelectedCenter(center)}
-                    >
-                      <Text style={styles.centerListName}>{center.name}</Text>
-                      <Text style={styles.centerListAddr}>{center.address}</Text>
-                    </Pressable>
-                  ))}
-                  {filteredCenters.length === 0 ? (
-                    <Text style={shared.hint}>Aucun centre trouve.</Text>
-                  ) : null}
+                <View style={styles.centerPickerPanel}>
+                  <View style={styles.centerPickerHeader}>
+                    <Text style={styles.centerPickerTitle}>
+                      {search.trim() ? "Resultats trouves" : "Centres suggeres"}
+                    </Text>
+                    <Text style={styles.centerPickerCount}>{filteredCenters.length}</Text>
+                  </View>
+                  <Text style={styles.centerPickerHint}>
+                    Touchez une carte pour associer la plainte au bon etablissement.
+                  </Text>
+                  <ScrollView
+                    style={styles.centerList}
+                    contentContainerStyle={styles.centerListContentWrap}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {filteredCenters.map((center) => (
+                      <Pressable
+                        key={center._id}
+                        style={styles.centerListItem}
+                        onPress={() => setSelectedCenter(center)}
+                      >
+                        <View style={styles.centerListTop}>
+                          <View style={styles.centerBullet} />
+                          <View style={styles.centerListContent}>
+                            <Text style={styles.centerListName}>{center.name}</Text>
+                            <Text style={styles.centerListAddr}>{center.address}</Text>
+                          </View>
+                          <View style={styles.centerSelectPill}>
+                            <Text style={styles.centerSelectText}>Choisir</Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    ))}
+                    {filteredCenters.length === 0 ? (
+                      <View style={styles.centerEmptyState}>
+                        <Text style={styles.centerEmptyTitle}>Aucun centre trouve</Text>
+                        <Text style={styles.centerEmptyText}>Essayez un autre mot-cle ou basculez sur plainte generale.</Text>
+                      </View>
+                    ) : null}
+                  </ScrollView>
                 </View>
               )}
             </View>
           ) : (
             <View style={styles.infoBox}>
-              <Text style={styles.infoBoxText}>Cette plainte ne sera pas liee a un centre specifique.</Text>
+              <Text style={styles.infoBoxText}>Cette plainte sera enregistree comme remarque generale sur le systeme de soins.</Text>
             </View>
           )}
 
-          {/* Subject */}
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionLabel}>SUJET</Text>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Sujet de la plainte</Text>
+              <Text style={styles.sectionCaption}>Touchez un theme ou saisissez votre propre sujet.</Text>
+            </View>
             <View style={styles.quickSubjects}>
               {QUICK_SUBJECTS.map((item) => (
                 <Pressable
                   key={item}
-                  style={[styles.quickChip, subject === item && styles.quickChipActive]}
+                  style={[styles.quickChip, selectedSubjectPreset === item && styles.quickChipActive]}
                   onPress={() => setSubject(item)}
                 >
-                  <Text style={[styles.quickChipText, subject === item && styles.quickChipTextActive]}>{item}</Text>
+                  <Text style={[styles.quickChipText, selectedSubjectPreset === item && styles.quickChipTextActive]}>{item}</Text>
                 </Pressable>
               ))}
             </View>
@@ -268,9 +323,11 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
             />
           </View>
 
-          {/* Description */}
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionLabel}>DESCRIPTION</Text>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>Description detaillee</Text>
+              <Text style={styles.sectionCaption}>Expliquez ce qui s'est passe, ou et depuis quand.</Text>
+            </View>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Decrivez precisement le probleme rencontre..."
@@ -279,7 +336,10 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
               onChangeText={setMessage}
               multiline
             />
-            <Text style={shared.hint}>{message.trim().length} caractere(s)</Text>
+            <View style={styles.counterRow}>
+              <Text style={styles.counterHint}>Plus vous etes precis, plus le traitement est rapide.</Text>
+              <Text style={styles.counterValue}>{message.trim().length} car.</Text>
+            </View>
           </View>
 
           {error   ? <Text style={styles.errorMsg}>{error}</Text>   : null}
@@ -298,7 +358,10 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
       {/* History */}
       {!hideHistory ? (
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionLabel}>MES PLAINTES</Text>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Suivi de mes plaintes</Text>
+            <Text style={styles.sectionCaption}>Retrouvez vos signalements en cours et ceux deja traites.</Text>
+          </View>
           <View style={styles.tabRow}>
             <Pressable
               style={[styles.tab, historyTab === "ACTIVE" && styles.tabActive]}
@@ -319,7 +382,10 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
           </View>
 
           {displayedComplaints.length === 0 ? (
-            <Text style={shared.hint}>Aucune plainte dans cet onglet.</Text>
+            <View style={styles.emptyHistoryBox}>
+              <Text style={styles.emptyHistoryTitle}>Aucune plainte ici pour le moment</Text>
+              <Text style={styles.emptyHistoryText}>Les nouveaux signalements apparaitront automatiquement dans cette section.</Text>
+            </View>
           ) : null}
 
           {displayedComplaints.map((item) => (
@@ -331,6 +397,7 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
               <Text style={styles.complaintMeta}>
                 {item.centerName || "Plainte generale"} · {new Date(item.createdAt).toLocaleDateString()}
               </Text>
+              <Text style={styles.complaintBody}>{item.message}</Text>
               {item.isOfflinePending ? (
                 <View style={styles.pendingSyncTag}>
                   <Text style={styles.pendingSyncTagText}>En attente de synchronisation</Text>
@@ -399,19 +466,45 @@ const styles = StyleSheet.create({
   title:    { fontSize: 20, fontWeight: "800", color: C.textDark },
   subtitle: { fontSize: 13, color: C.textMuted },
 
-  modeRow: { flexDirection: "row", gap: 8 },
-  modeBtn: {
-    flex: 1,
-    borderRadius: R.sm,
-    borderWidth: 1.5,
-    borderColor: C.border,
-    paddingVertical: 11,
-    alignItems: "center",
-    backgroundColor: C.surface,
+  heroCard: {
+    backgroundColor: "#102542",
+    borderRadius: R.lg,
+    padding: 16,
+    gap: 14,
+    ...S.md,
   },
-  modeBtnActive:    { backgroundColor: C.primary, borderColor: C.primary },
-  modeBtnText:      { color: C.textMed, fontWeight: "700", fontSize: 13 },
-  modeBtnTextActive:{ color: "#fff" },
+  heroRow: { flexDirection: "row", gap: 12, alignItems: "center" },
+  heroIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#f59e0b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroIconText: { color: "#fff", fontWeight: "900", fontSize: 22 },
+  heroTextWrap: { flex: 1, gap: 2 },
+  heroTitle: { color: "#fff", fontSize: 16, fontWeight: "800" },
+  heroSubtitle: { color: "rgba(255,255,255,0.78)", fontSize: 12.5, lineHeight: 18 },
+  modeGrid: { flexDirection: "row", gap: 10 },
+  modeCard: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: R.md,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    padding: 12,
+    gap: 6,
+  },
+  modeCardActive: {
+    backgroundColor: "#ffffff",
+    borderColor: "#ffffff",
+  },
+  modeEmoji: { fontSize: 20 },
+  modeCardTitle: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  modeCardTitleActive: { color: C.textDark },
+  modeCardDesc: { color: "rgba(255,255,255,0.75)", fontSize: 12, lineHeight: 17 },
+  modeCardDescActive: { color: C.textMuted },
 
   sectionCard: {
     backgroundColor: C.surface,
@@ -422,6 +515,9 @@ const styles = StyleSheet.create({
     gap: 10,
     ...S.sm,
   },
+  sectionHead: { gap: 4, marginBottom: 2 },
+  sectionTitle: { fontSize: 15, fontWeight: "800", color: C.textDark },
+  sectionCaption: { fontSize: 12.5, color: C.textMuted, lineHeight: 18 },
   sectionLabel: shared.sectionLabel,
   input: { ...shared.input },
   textArea: { ...shared.input, ...shared.textArea },
@@ -444,6 +540,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   selectedCenterInfo:  { flex: 1 },
+  selectedCenterTag: { color: C.primary, fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 },
   selectedCenterName:  { fontWeight: "700", color: C.primary, fontSize: 14 },
   selectedCenterAddr:  { fontSize: 12, color: C.textMuted, marginTop: 2 },
   changeCenterBtn: {
@@ -456,15 +553,73 @@ const styles = StyleSheet.create({
   changeCenterBtnText: { color: C.primary, fontWeight: "600", fontSize: 12 },
 
   centerList: { gap: 6, maxHeight: 200 },
-  centerListItem: {
-    backgroundColor: C.bg,
-    borderRadius: R.sm,
-    padding: 10,
+  centerPickerPanel: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.md,
     borderWidth: 1,
     borderColor: C.border,
+    padding: 10,
+    gap: 8,
   },
+  centerPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  centerPickerTitle: { color: C.textDark, fontWeight: "800", fontSize: 13 },
+  centerPickerCount: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: C.primaryLight,
+    color: C.primary,
+    textAlign: "center",
+    textAlignVertical: "center",
+    fontWeight: "800",
+    fontSize: 12,
+    lineHeight: 28,
+    overflow: "hidden",
+  },
+  centerPickerHint: { color: C.textMuted, fontSize: 12, lineHeight: 17 },
+  centerList: { maxHeight: 240 },
+  centerListContentWrap: { gap: 8 },
+  centerListItem: {
+    backgroundColor: C.surface,
+    borderRadius: R.sm,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    ...S.sm,
+  },
+  centerListTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  centerBullet: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: C.primary,
+  },
+  centerListContent: { flex: 1 },
   centerListName: { fontWeight: "700", color: C.textDark, fontSize: 13 },
   centerListAddr: { color: C.textMuted, fontSize: 12, marginTop: 2 },
+  centerSelectPill: {
+    backgroundColor: C.primaryLight,
+    borderRadius: R.full,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  centerSelectText: { color: C.primary, fontWeight: "700", fontSize: 12 },
+  centerEmptyState: {
+    backgroundColor: C.surface,
+    borderRadius: R.sm,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: C.borderDark,
+    padding: 14,
+    gap: 4,
+    alignItems: "center",
+  },
+  centerEmptyTitle: { color: C.textDark, fontWeight: "700", fontSize: 13 },
+  centerEmptyText: { color: C.textMuted, fontSize: 12, textAlign: "center", lineHeight: 17 },
 
   quickSubjects: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   quickChip: {
@@ -478,6 +633,9 @@ const styles = StyleSheet.create({
   quickChipActive:    { backgroundColor: C.primary, borderColor: C.primary },
   quickChipText:      { color: C.textMed, fontWeight: "600", fontSize: 12 },
   quickChipTextActive:{ color: "#fff" },
+  counterRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
+  counterHint: { color: C.textMuted, fontSize: 11.5, flex: 1 },
+  counterValue: { color: C.primary, fontWeight: "700", fontSize: 12 },
 
   submitBtn: {
     backgroundColor: C.primary,
@@ -505,6 +663,16 @@ const styles = StyleSheet.create({
   tabActive:    { backgroundColor: C.primary, borderColor: C.primary },
   tabText:      { color: C.textMed, fontWeight: "700", fontSize: 13 },
   tabTextActive:{ color: "#fff" },
+  emptyHistoryBox: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: R.sm,
+    padding: 14,
+    gap: 5,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  emptyHistoryTitle: { color: C.textDark, fontWeight: "700", fontSize: 13 },
+  emptyHistoryText: { color: C.textMuted, fontSize: 12.5, lineHeight: 18 },
 
   complaintCard: {
     backgroundColor: C.bg,
@@ -517,6 +685,7 @@ const styles = StyleSheet.create({
   complaintCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 },
   complaintSubject: { flex: 1, fontWeight: "700", color: C.textDark, fontSize: 14 },
   complaintMeta:    { fontSize: 12, color: C.textMuted },
+  complaintBody:    { fontSize: 13, color: C.textMed, lineHeight: 19 },
 
   statusBadge: {
     borderRadius: R.full,

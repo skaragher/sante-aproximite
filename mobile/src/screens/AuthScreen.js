@@ -91,9 +91,11 @@ export function AuthScreen() {
           <View style={styles.hero}>
             <View style={styles.heroBlobPrimary} />
             <View style={styles.heroBlobSecondary} />
-            <Image source={require("../../assets/logo-sante.png")} style={styles.heroLogo} />
+            <View style={styles.heroLogoPanel}>
+              <Image source={require("../../assets/logo-sante.png")} style={styles.heroLogo} resizeMode="contain" />
+            </View>
             <Text style={styles.title}>Sante Aproximite</Text>
-            <Text style={styles.heroSubtitle}>Plateforme mobile de signalement et d'orientation sanitaire.</Text>
+            <Text style={styles.heroSubtitle}>Plateforme mobile de signalement, d'orientation sanitaire et de securite de proximite.</Text>
             <View style={styles.heroBadgeRow}>
               <Text style={styles.heroBadge}>Urgence 24/7</Text>
               <Text style={styles.heroBadge}>Geolocalisation</Text>
@@ -289,51 +291,65 @@ const styles = StyleSheet.create({
   hero: {
     position: "relative",
     overflow: "hidden",
-    borderRadius: 18,
-    backgroundColor: "#1f2937",
-    borderColor: "#111827",
+    borderRadius: 24,
+    backgroundColor: "#ffffff",
+    borderColor: "#e5eef8",
     borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingHorizontal: 18,
+    paddingTop: 22,
+    paddingBottom: 24,
     alignItems: "center",
-    marginBottom: 4
+    marginBottom: 6,
+    gap: 10
   },
   heroBlobPrimary: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "#f97316",
+    top: -90,
+    right: -80,
+    opacity: 0.22
+  },
+  heroBlobSecondary: {
     position: "absolute",
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: "#f97316",
-    top: -80,
-    right: -70,
-    opacity: 0.28
-  },
-  heroBlobSecondary: {
-    position: "absolute",
-    width: 140,
-    height: 140,
-    borderRadius: 70,
     backgroundColor: "#fb923c",
-    bottom: -65,
-    left: -55,
-    opacity: 0.2
+    bottom: -75,
+    left: -65,
+    opacity: 0.16
+  },
+  heroLogoPanel: {
+    width: "100%",
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center"
   },
   heroLogo: {
-    width: 68,
-    height: 68,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#fed7aa",
-    marginBottom: 8
+    width: 220,
+    height: 220
   },
-  title: { fontSize: 30, fontWeight: "800", color: "#ffffff" },
-  heroSubtitle: { color: "#fde68a", marginTop: 4, textAlign: "center", fontWeight: "600" },
+  title: { fontSize: 32, fontWeight: "900", color: "#16314f", textAlign: "center" },
+  heroSubtitle: {
+    color: "#47627d",
+    marginTop: 2,
+    textAlign: "center",
+    fontWeight: "600",
+    fontSize: 13,
+    lineHeight: 20,
+    paddingHorizontal: 8
+  },
   heroBadgeRow: { flexDirection: "row", gap: 8, marginTop: 10 },
   heroBadge: {
-    backgroundColor: "#111827",
-    borderColor: "#374151",
+    backgroundColor: "#f0f7ff",
+    borderColor: "#d7e7f8",
     borderWidth: 1,
-    color: "#f9fafb",
+    color: "#16314f",
     fontSize: 12,
     fontWeight: "700",
     borderRadius: 999,
@@ -344,8 +360,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     borderColor: "#fed7aa",
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 20,
+    padding: 16,
     gap: 12
   },
   subtitle: { color: "#7c2d12", marginBottom: 4, fontWeight: "600" },

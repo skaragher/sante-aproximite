@@ -135,7 +135,7 @@ export function NearbyScreen() {
   async function fetchNearby(position = coords, { silent = false } = {}) {
     if (!position) return;
     if (!silent) setLoading(true);
-    setError("");
+    if (!silent) setError("");
     try {
       const parsedRadius = parseRadiusKm(radiusKm);
       if (parsedRadius === null) throw new Error("Rayon invalide. Entrez une valeur entre 1 et 700 km.");
@@ -157,14 +157,22 @@ export function NearbyScreen() {
       }
       const refreshedCatalog = await loadCenterCatalog(token);
       applyCatalogToState(refreshedCatalog, position, radiusKm);
-      const bases = await apiFetch(
-        `/emergency-reports/bases/nearby?latitude=${position.lat}&longitude=${position.lon}&radiusKm=${parsedRadius}`,
-        { token }
-      );
-      setEmergencyBases(Array.isArray(bases) ? bases : []);
+      try {
+        const bases = await apiFetch(
+          `/emergency-reports/bases/nearby?latitude=${position.lat}&longitude=${position.lon}&radiusKm=${parsedRadius}`,
+          { token }
+        );
+        setEmergencyBases(Array.isArray(bases) ? bases : []);
+      } catch {
+        setEmergencyBases([]);
+      }
     } catch (err) {
-      setError(err.message);
-      setCatalogStatus((prev) => ({ ...prev, ready: false }));
+      const currentCatalog = await loadCenterCatalog(token).catch(() => ({ centers: [] }));
+      const hasLocalCenters = Array.isArray(currentCatalog?.centers) && currentCatalog.centers.length > 0;
+      if (!hasLocalCenters) {
+        setError(err.message);
+        setCatalogStatus((prev) => ({ ...prev, ready: false }));
+      }
     } finally {
       if (!silent) setLoading(false);
     }

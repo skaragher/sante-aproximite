@@ -36,14 +36,14 @@ function isNetworkFailure(error) {
 
 function normalizeError(error) {
   if (error?.name === "AbortError") {
-    return new Error(
-      "Serveur indisponible. Verifiez votre connexion Internet, puis reessayez."
-    );
+    const err = new Error("Certaines informations ne sont pas disponibles pour le moment. Reessayez plus tard.");
+    err.code = "UPSTREAM_TIMEOUT";
+    return err;
   }
   if (error?.message === "Network request failed") {
-    return new Error(
-      "Impossible de charger les informations, Verifiez votre connexion Internet."
-    );
+    const err = new Error("Certaines informations ne peuvent pas etre mises a jour pour le moment.");
+    err.code = "NETWORK_UNREACHABLE";
+    return err;
   }
   return error;
 }
