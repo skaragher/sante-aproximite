@@ -34,7 +34,10 @@ export function Root() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [chefCenterApprovalStatus, setChefCenterApprovalStatus] = useState(null);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [syncNotice, setSyncNotice] = useState(null);
   const autoSelectedResponderTab = useRef(false);
+  const pendingSyncCountRef = useRef(0);
+  const syncNoticeTimeoutRef = useRef(null);
 
   const normalizeRoleValue = (value) => String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
   const normalizedRole = normalizeRoleValue(user?.role);
@@ -69,11 +72,27 @@ export function Root() {
         : "Urgences sanitaires Pompiers";
 
   useEffect(() => {
+    function showSyncNotice(message, tone = "info") {
+      if (syncNoticeTimeoutRef.current) clearTimeout(syncNoticeTimeoutRef.current);
+      setSyncNotice({ message, tone });
+      syncNoticeTimeoutRef.current = setTimeout(() => {
+        setSyncNotice(null);
+        syncNoticeTimeoutRef.current = null;
+      }, 4500);
+    }
+
     const runSync = async () => {
       try {
         await syncPendingRequests();
       } finally {
         const nextCount = await getPendingRequestsCount().catch(() => 0);
+        const previousCount = pendingSyncCountRef.current;
+        if (previousCount === 0 && nextCount > 0) {
+          showSyncNotice("Vous etes hors ligne. Les actions seront synchronisees automatiquement.", "warning");
+        } else if (previousCount > 0 && nextCount === 0) {
+          showSyncNotice("Synchronisation terminee.", "success");
+        }
+        pendingSyncCountRef.current = nextCount;
         setPendingSyncCount(nextCount);
       }
     };
@@ -82,7 +101,11 @@ export function Root() {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") runSync();
     });
-    return () => { clearInterval(interval); sub.remove(); };
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+      if (syncNoticeTimeoutRef.current) clearTimeout(syncNoticeTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -276,10 +299,20 @@ export function Root() {
 
       {/* Content */}
       <View style={styles.content}>
-        {pendingSyncCount > 0 ? (
-          <View style={styles.offlineBanner}>
-            <Text style={styles.offlineBannerText}>
-              {pendingSyncCount} action(s) en attente de synchronisation.
+        {syncNotice ? (
+          <View
+            style={[
+              styles.syncNotice,
+              syncNotice.tone === "success" ? styles.syncNoticeSuccess : styles.syncNoticeWarning
+            ]}
+          >
+            <Text
+              style={[
+                styles.syncNoticeText,
+                syncNotice.tone === "success" ? styles.syncNoticeTextSuccess : styles.syncNoticeTextWarning
+              ]}
+            >
+              {syncNotice.message}
             </Text>
           </View>
         ) : null}
@@ -416,22 +449,29 @@ const styles = StyleSheet.create({
   logoutBtnText: { color: C.red, fontWeight: "700", fontSize: 15 },
 
   content: { flex: 1, marginTop: 10 },
-  offlineBanner: {
+  syncNotice: {
     marginHorizontal: 12,
     marginBottom: 8,
-    backgroundColor: C.amberLight,
     borderWidth: 1,
-    borderColor: C.amber,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  offlineBannerText: {
-    color: C.amber,
+  syncNoticeWarning: {
+    backgroundColor: C.amberLight,
+    borderColor: C.amber,
+  },
+  syncNoticeSuccess: {
+    backgroundColor: C.greenLight,
+    borderColor: C.green,
+  },
+  syncNoticeText: {
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
   },
+  syncNoticeTextWarning: { color: C.amber },
+  syncNoticeTextSuccess: { color: C.green },
   footer: {
     paddingVertical: 10,
     alignItems: "center",

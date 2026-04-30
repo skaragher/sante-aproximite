@@ -144,7 +144,7 @@ export function NearbyScreen() {
         const syncResult = await syncCenterCatalog(token, { forceFull: true });
         const alreadyNotified = await getCenterCatalogMeta(META_KEY_INITIAL_LOAD_NOTIFIED);
         if (!alreadyNotified && syncResult.centerCount > 0) {
-          showCatalogNotice("Le premier chargement de la base locale a ete effectue avec succes.");
+          showCatalogNotice("Les donnees locales sont pretes pour une utilisation hors ligne.");
           await setCenterCatalogMeta(META_KEY_INITIAL_LOAD_NOTIFIED, new Date().toISOString());
         }
       } else {
@@ -152,16 +152,8 @@ export function NearbyScreen() {
         syncCenterCatalog(token)
           .then((syncResult) => {
             applyCatalogToState(syncResult, position, radiusKm);
-            if (syncResult.changedCount > 0) {
-              showCatalogNotice("La base locale a ete synchronisee avec succes.", { durationMs: 5000 });
-            }
           })
-          .catch(() => {
-            showCatalogNotice("Mode hors ligne actif: affichage des donnees locales disponibles.", {
-              tone: "info",
-              durationMs: 5000
-            });
-          });
+          .catch(() => {});
       }
       const refreshedCatalog = await loadCenterCatalog(token);
       applyCatalogToState(refreshedCatalog, position, radiusKm);
