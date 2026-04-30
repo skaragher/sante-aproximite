@@ -4,8 +4,8 @@ import { env } from "./config/env.js";
 
 async function bootstrap() {
   await connectDb();
-  app.listen(env.port, '0.0.0.0', () => {
-  console.log(`API running on http://0.0.0.0:${env.port}`);
+  app.listen(env.port, env.host, () => {
+  console.log(`API running on http://${env.host}:${env.port}`);
   });
 }
 

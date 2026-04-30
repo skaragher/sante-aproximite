@@ -1,17 +1,79 @@
 <template>
   <main class="auth-wrap">
-    <section class="auth-card">
+    <!-- Left brand panel -->
+    <section class="auth-brand">
+      <div class="auth-brand-logo">
+        <img src="/logo-web.svg" alt="logo" />
+      </div>
       <h1>Sante Aproximite</h1>
-      <p>Connexion</p>
+      <p>Plateforme de gestion et de pilotage des etablissements sanitaires.</p>
+      <div class="auth-brand-features">
+        <div class="auth-feature">
+          <span class="auth-feature-icon">🏥</span>
+          Localisation des centres de sante
+        </div>
+        <div class="auth-feature">
+          <span class="auth-feature-icon">🚨</span>
+          Gestion des alertes d'urgence
+        </div>
+        <div class="auth-feature">
+          <span class="auth-feature-icon">📊</span>
+          Suivi des performances sanitaires
+        </div>
+        <div class="auth-feature">
+          <span class="auth-feature-icon">📝</span>
+          Gestion des plaintes et evaluations
+        </div>
+      </div>
+    </section>
 
-      <form @submit.prevent="submit" class="form-grid">
-        <input v-model="form.email" type="email" placeholder="Email" required />
-        <input v-model="form.password" type="password" placeholder="Mot de passe" required />
-        <p v-if="error" class="error">{{ error }}</p>
-        <button :disabled="loading">{{ loading ? "Connexion..." : "Se connecter" }}</button>
-      </form>
+    <!-- Right form panel -->
+    <section class="auth-form-panel">
+      <div class="auth-card">
+        <div class="auth-card-header">
+          <h2>Connexion</h2>
+          <p>Entrez vos identifiants pour acceder a la plateforme.</p>
+        </div>
 
-      <router-link to="/register">Creer un compte</router-link>
+        <form @submit.prevent="submit" class="form-grid">
+          <div class="form-field">
+            <label for="login-email">Adresse email</label>
+            <input
+              id="login-email"
+              v-model="form.email"
+              type="email"
+              placeholder="vous@exemple.com"
+              required
+              autocomplete="email"
+            />
+          </div>
+
+          <div class="form-field">
+            <label for="login-password">Mot de passe</label>
+            <input
+              id="login-password"
+              v-model="form.password"
+              type="password"
+              placeholder="••••••••"
+              required
+              autocomplete="current-password"
+            />
+          </div>
+
+          <p v-if="error" class="error">{{ error }}</p>
+
+          <div class="form-actions">
+            <button class="btn-full" :disabled="loading">
+              {{ loading ? "Connexion en cours..." : "Se connecter" }}
+            </button>
+          </div>
+        </form>
+
+        <div class="auth-footer">
+          Pas encore de compte ?
+          <router-link to="/register">Creer un compte</router-link>
+        </div>
+      </div>
     </section>
   </main>
 </template>

@@ -2,17 +2,24 @@ import { pool } from "../config/db.js";
 
 const TARGET_SERVICE_MAP = {
   SAMU: "SAMU",
-  SAPEUR_POMPIER: "SAPPEUR_POMPIER",
-  SAPPEUR_POMPIER: "SAPPEUR_POMPIER",
-  POMPIER: "SAPPEUR_POMPIER",
-  POMPIERS: "SAPPEUR_POMPIER"
+  SAPEUR_POMPIER: "SAPEUR_POMPIER",
+  SAPEUR_POMPIER: "SAPEUR_POMPIER",  // ancienne orthographe (double P)
+  POMPIER: "SAPEUR_POMPIER",
+  POMPIERS: "SAPEUR_POMPIER",
+  POLICE: "POLICE",
+  GENDARMERIE: "GENDARMERIE",
+  PROTECTION_CIVILE: "PROTECTION_CIVILE"
 };
 
 const BASE_STATUS_VALUES = ["NEW", "ACKNOWLEDGED", "EN_ROUTE", "ON_SITE", "COMPLETED", "CLOSED"];
 
 const EMERGENCY_ALLOWED_ROLES = new Set([
   "SAMU",
-  "SAPPEUR_POMPIER",
+  "SAPEUR_POMPIER",
+  "SAPEUR_POMPIER",  // ancienne orthographe DB (double P)
+  "POLICE",
+  "GENDARMERIE",
+  "PROTECTION_CIVILE",
   "REGULATOR",
   "NATIONAL",
   "REGION",
@@ -21,8 +28,17 @@ const EMERGENCY_ALLOWED_ROLES = new Set([
 
 function serviceFromRole(role) {
   if (role === "SAMU") return "SAMU";
-  if (role === "SAPPEUR_POMPIER") return "SAPPEUR_POMPIER";
+  if (role === "SAPEUR_POMPIER" || role === "SAPEUR_POMPIER") return "SAPEUR_POMPIER";
+  if (role === "POLICE") return "POLICE";
+  if (role === "GENDARMERIE") return "GENDARMERIE";
+  if (role === "PROTECTION_CIVILE") return "PROTECTION_CIVILE";
   return null;
+}
+
+// Retourne toutes les variantes acceptees pour un service (compatibilite ancienne BD)
+function serviceVariants(service) {
+  if (service === "SAPEUR_POMPIER") return ["SAPEUR_POMPIER", "SAPEUR_POMPIER"];
+  return [service];
 }
 
 function normalizeTargetService(raw) {
@@ -130,7 +146,10 @@ function formatDurationFr(totalMinutes) {
 
 function serviceLabel(service) {
   if (service === "SAMU") return "SAMU";
-  if (service === "SAPPEUR_POMPIER") return "SAPEUR-POMPIER";
+  if (service === "SAPEUR_POMPIER" || service === "SAPEUR_POMPIER") return "SAPEUR-POMPIER";
+  if (service === "POLICE") return "Police";
+  if (service === "GENDARMERIE") return "Gendarmerie";
+  if (service === "PROTECTION_CIVILE") return "Protection Civile";
   return "service d'urgence";
 }
 
@@ -222,7 +241,7 @@ export async function createEmergencyReport(req, res) {
   const longitude = parseLongitude(req.body?.longitude);
 
   if (!targetService) {
-    return res.status(400).json({ message: "Service d'urgence invalide (SAMU ou SAPPEUR_POMPIER)." });
+    return res.status(400).json({ message: "Service d'urgence invalide (SAMU ou SAPEUR_POMPIER)." });
   }
   if (phoneNumber.length !== 10) {
     return res.status(400).json({ message: "Numero de telephone invalide (10 chiffres requis)." });
@@ -285,9 +304,10 @@ export async function getEmergencyReports(req, res) {
   const whereParts = [];
   const params = [];
 
+  // Chaque service ne voit que ses propres alertes
   if (roleService) {
-    whereParts.push(`er.target_service = $${params.length + 1}`);
-    params.push(roleService);
+    whereParts.push(`er.target_service = ANY($${params.length + 1}::text[])`);
+    params.push(serviceVariants(roleService));
   }
   const status = normalizeEmergencyStatus(req.query?.status);
   if (status) {
@@ -403,7 +423,7 @@ export async function acknowledgeEmergencyReport(req, res) {
 
   const roleService = serviceFromRole(String(req.user.role || "").toUpperCase());
   if (!roleService) {
-    return res.status(403).json({ message: "Seuls SAMU et SAPPEUR_POMPIER peuvent prendre en charge." });
+    return res.status(403).json({ message: "Seuls SAMU et SAPEUR_POMPIER peuvent prendre en charge." });
   }
   const teamLatitude = req.body?.teamLatitude == null ? null : parseLatitude(req.body?.teamLatitude);
   const teamLongitude = req.body?.teamLongitude == null ? null : parseLongitude(req.body?.teamLongitude);
@@ -421,10 +441,10 @@ export async function acknowledgeEmergencyReport(req, res) {
         team_latitude = COALESCE($4, team_latitude),
         team_longitude = COALESCE($5, team_longitude)
       WHERE id = $1
-        AND target_service = $2
+        AND target_service = ANY($2::text[])
       RETURNING *;
     `,
-    [reportId, roleService, Number(req.user.id), teamLatitude, teamLongitude]
+    [reportId, serviceVariants(roleService), Number(req.user.id), teamLatitude, teamLongitude]
   );
 
   if (updated.rowCount === 0) {
@@ -445,7 +465,7 @@ export async function updateEmergencyProgress(req, res) {
 
   const roleService = serviceFromRole(String(req.user.role || "").toUpperCase());
   if (!roleService) {
-    return res.status(403).json({ message: "Seuls SAMU et SAPPEUR_POMPIER peuvent mettre a jour une alerte." });
+    return res.status(403).json({ message: "Seuls SAMU et SAPEUR_POMPIER peuvent mettre a jour une alerte." });
   }
 
   const status = normalizeEmergencyStatus(req.body?.status);
@@ -471,11 +491,11 @@ export async function updateEmergencyProgress(req, res) {
         team_longitude = COALESCE($6, team_longitude),
         team_note = CASE WHEN $7 = '' THEN team_note ELSE $7 END
       WHERE id = $1
-        AND target_service = $2
+        AND target_service = ANY($2::text[])
         AND (handled_by IS NULL OR handled_by = $3)
       RETURNING *;
     `,
-    [reportId, roleService, Number(req.user.id), status, teamLatitude, teamLongitude, teamNote]
+    [reportId, serviceVariants(roleService), Number(req.user.id), status, teamLatitude, teamLongitude, teamNote]
   );
 
   if (updated.rowCount === 0) {
@@ -503,7 +523,7 @@ export async function createEmergencyBase(req, res) {
 
   const serviceType = roleService || requestedService;
   if (!serviceType) {
-    return res.status(400).json({ message: "serviceType invalide (SAMU ou SAPPEUR_POMPIER)." });
+    return res.status(400).json({ message: "serviceType invalide (SAMU ou SAPEUR_POMPIER)." });
   }
   if (!name || !address || latitude == null || longitude == null) {
     return res.status(400).json({ message: "name, address, latitude et longitude sont obligatoires." });
@@ -559,7 +579,9 @@ export async function getNearbyEmergencyBases(req, res) {
   const latitude = parseLatitude(req.query?.latitude);
   const longitude = parseLongitude(req.query?.longitude);
   const radiusKm = Number(req.query?.radiusKm);
-  const validRadius = Number.isFinite(radiusKm) && radiusKm > 0 ? radiusKm : 30;
+  const validRadius = Number.isFinite(radiusKm) && radiusKm > 0
+    ? Math.min(700, Math.max(1, radiusKm))
+    : 30;
   const requestedService = normalizeTargetService(req.query?.serviceType);
 
   if (latitude == null || longitude == null) {

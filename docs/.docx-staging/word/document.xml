@@ -1,0 +1,1096 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+            xmlns:v="urn:schemas-microsoft-com:vml"
+            xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:w10="urn:schemas-microsoft-com:office:word"
+            xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+            xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+            xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+            xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+            xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+            mc:Ignorable="w14 wp14">
+  <w:body>
+    <w:p>
+  <w:pPr>
+    <w:pStyle w:val='Title'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>SANTE APROXIMITE</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Subtitle'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Dossier commercial et publicitaire</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Subtitle'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Document de presentation destine aux autorites publiques, partenaires financiers et bailleurs.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Subtitle'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Version editable Word - Avril 2026</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:spacing w:after='120'/>
+  </w:pPr>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Quote'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr><w:i/></w:rPr>
+    <w:t xml:space='preserve'>Acces aux soins, coordination d&apos;urgence et pilotage territorial dans une seule plateforme.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:spacing w:after='120'/>
+  </w:pPr>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Resume executif</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Sante Aproximite est une solution numerique complete qui relie les citoyens, les centres de sante, les services d&apos;urgence et les autorites de regulation autour d&apos;un meme systeme d&apos;information. L&apos;application combine une experience mobile pour les usagers et les equipes terrain avec un back-office web de pilotage pour les institutions.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>La plateforme permet de geolocaliser les centres de sante, afficher les services disponibles, orienter les usagers vers le point de prise en charge le plus proche, remonter des plaintes, suivre la satisfaction, et transmettre des alertes d&apos;urgence ou de securite avec la position GPS.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pour les pouvoirs publics et les financeurs, Sante Aproximite apporte un double impact: un meilleur service rendu a la population et des donnees de terrain exploitables pour la decision, la planification et l&apos;evaluation des politiques publiques.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Le defi a resoudre</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Dans de nombreux territoires, l&apos;information sanitaire reste dispersee: les citoyens connaissent mal l&apos;offre de soins disponible, les etablissements sont inegalement visibles, les services d&apos;urgence manquent parfois de donnees fiables au moment critique, et les autorites disposent de peu d&apos;indicateurs consolides sur la qualite de service et la couverture territoriale.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Cette fragmentation entraine des pertes de temps, des erreurs d&apos;orientation, une saturation de certains centres, une faible tracabilite des plaintes et une difficulte a prioriser les investissements publics ou prives.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Notre reponse</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Sante Aproximite propose une infrastructure numerique simple, concrete et operationnelle pour connecter l&apos;offre de soins, les besoins des usagers et le pilotage institutionnel.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr><w:b/></w:rPr>
+    <w:t xml:space='preserve'>La solution s&apos;appuie sur trois briques complementaires:</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une application mobile pour les citoyens et les operateurs terrain.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une plateforme web d&apos;administration, de regulation et de supervision.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une API centralisee avec gestion des roles, des territoires, des centres, des alertes et des indicateurs.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Fonctionnalites strategiques deja structurees dans l&apos;application</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>1. Cartographie et orientation vers les soins</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Recherche des centres de sante les plus proches selon la position GPS de l&apos;usager.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Affichage du plateau technique, des services disponibles, du niveau et du type d&apos;etablissement.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Navigation directe vers le centre selectionne.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Consultation des bases d&apos;urgence a proximite.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>2. Gestion des urgences et coordination de terrain</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Transmission d&apos;alertes vers le SAMU, les sapeurs-pompiers, la police, la gendarmerie ou la protection civile.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Envoi de la position GPS, du telephone, du point de prise en charge, de la description et, si besoin, de photos.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Suivi du statut de l&apos;alerte: nouvelle, prise en charge, equipe en route, equipe sur site, intervention terminee.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Tableaux de bord de supervision pour les acteurs operationnels.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>3. Gouvernance, regulation et qualite de service</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Gestion des utilisateurs par role: national, region, district, etablissement, urgences et securite.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Validation des comptes et des centres avant activation.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Administration du referentiel territorial: regions et districts.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Gestion et traitement des plaintes usagers avec commentaires, statuts et historique.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Evaluation de la satisfaction et notation des centres.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Syntheses statistiques sur les plaintes, la satisfaction et la couverture des evaluations.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>4. Industrialisation et passage a l&apos;echelle</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Importation de centres, regions et districts depuis des fichiers Excel ou CSV.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Structuration des donnees avec codes d&apos;etablissement, rattachements territoriaux et statuts de validation.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Architecture monorepo avec application mobile, application web et backend API.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pourquoi les autorites publiques ont interet a soutenir Sante Aproximite</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Renforcer l&apos;equite d&apos;acces aux soins par une meilleure orientation des populations.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Disposer d&apos;une cartographie dynamique et exploitable des structures sanitaires.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Accroitre la reactivite face aux urgences sanitaires et evenements critiques.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Instaurer une boucle de redevabilite grace aux plaintes, aux justifications et aux evaluations.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Mieux cibler les decisions d&apos;investissement public selon les territoires sous-servis ou mal evalues.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Moderniser la relation entre l&apos;Etat, les etablissements et les usagers avec un outil visible, utile et mesurable.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pourquoi les partenaires financiers et bailleurs ont interet a accompagner le projet</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Sante Aproximite n&apos;est pas seulement une application. C&apos;est un levier de transformation mesurable, facilement presentable dans un programme de financement oriente sante publique, services essentiels, inclusion numerique, resilience territoriale ou gouvernance.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr><w:b/></w:rPr>
+    <w:t xml:space='preserve'>Le projet offre aux bailleurs une opportunite d&apos;investir dans une solution a impact direct, visible et pilotable autour de cinq axes:</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Impact social: reduction des obstacles d&apos;acces a l&apos;information sanitaire et meilleure orientation des patients.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Impact institutionnel: renforcement des capacites de regulation, de supervision et de coordination.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Impact territorial: meilleure couverture des zones prioritaires grace a des donnees geolocalisees.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Impact reputatif: un projet concret, visible sur le terrain, facilement valorisable dans les rapports d&apos;impact.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Impact economique: meilleure allocation des ressources, reduction des pertes de temps et meilleure priorisation des investissements.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Elements differenciants</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une approche unifiee qui relie sante de proximite, urgence, securite et gouvernance.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une logique multi-acteurs: usagers, chefs d&apos;etablissement, regulateurs, services d&apos;urgence et services de securite.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une lecture territoriale native avec regions, districts, centres et bases d&apos;urgence.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Une capacite de passage a l&apos;echelle grace aux imports en masse et aux workflows d&apos;approbation.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Un potentiel fort de reporting, de suivi d&apos;indicateurs et de redevabilite publique.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Proposition de valeur par cible</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pour les ministeres et agences publiques</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Un outil de modernisation de l&apos;offre de service public, d&apos;orientation des citoyens et de supervision territoriale.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pour les collectivites et structures decentralisees</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Une solution concrete pour visualiser les besoins, suivre les centres, documenter la qualite de service et repondre plus vite aux situations critiques.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pour les partenaires financiers</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Un projet numerique avec impact mesurable, portefeuille d&apos;indicateurs clair et forte possibilite de replication par territoire.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Pour les bailleurs et fondations</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Une intervention a forte utilite sociale, orientee acces, urgence, redevabilite et amelioration continue des services publics.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Indicateurs d&apos;impact a mettre en avant</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Nombre de centres references, geolocalises et valides.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Nombre d&apos;usagers actifs et de recherches de centres effectuees.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Nombre d&apos;alertes d&apos;urgence et de securite transmises et traitees.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Delai moyen de prise en charge d&apos;une alerte.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Volume de plaintes traitees et taux de resolution.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Note moyenne et taux de satisfaction des centres.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Couverture territoriale du dispositif par region et district.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Modeles de partenariat proposes</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>1. Pilotage institutionnel</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Accompagnement d&apos;un pilote sur une region, un district sanitaire ou une zone urbaine prioritaire, avec mesure des resultats sur une periode de 3 a 6 mois.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>2. Financement de passage a l&apos;echelle</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Extension progressive de la plateforme a plusieurs territoires avec renforcement de l&apos;hebergement, de l&apos;assistance, de la formation et de la collecte de donnees.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>3. Appui en equipements et connectivite</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Mise a disposition de smartphones, tablettes, forfaits data, stations de supervision ou appuis logistiques pour les equipes terrain et les centres pilotes.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>4. Partenariat technique et data</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Co-construction de tableaux de bord, indicateurs d&apos;impact, mecanismes d&apos;interoperabilite et outils de decision pour les institutions.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Message publicitaire institutionnel</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Quote'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr><w:i/></w:rPr>
+    <w:t xml:space='preserve'>Sante Aproximite rapproche les populations des soins, donne aux decideurs une vision claire du territoire et aide les services d&apos;urgence a intervenir plus vite. C&apos;est une solution utile, visible et finançable pour moderniser l&apos;acces aux soins et renforcer la confiance entre citoyens, etablissements et institutions.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Formulation courte pour brochure ou presentation</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Une plateforme numerique qui localise l&apos;offre de soins, facilite l&apos;orientation des usagers, remonte les alertes en temps reel et fournit aux autorites des tableaux de bord pour agir mieux et plus vite.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading2'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Formulation courte pour financeurs</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Investir dans Sante Aproximite, c&apos;est financer une infrastructure de sante digitale a impact direct, avec des retombees concretes sur l&apos;acces, l&apos;urgence, la satisfaction usager et la gouvernance territoriale.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Prochaines etapes recommandees</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Lancer une demonstration institutionnelle guidee.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Selectionner un territoire pilote et definir les indicateurs de succes.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Structurer un plan de financement en trois volets: technologie, deploiement, accompagnement.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>• Preparer une convention de partenariat avec calendrier, livrables et reporting d&apos;impact.</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Contacts a personnaliser</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Promoteur du projet: [A completer]</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Organisation: [A completer]</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Telephone: [A completer]</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Email: [A completer]</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Ville / Pays: [A completer]</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Heading1'/>
+  </w:pPr>
+  <w:r><w:br w:type='page'/></w:r>
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Annexe - Base factuelle issue de l&apos;application</w:t>
+  </w:r>
+</w:p>
+<w:p>
+  <w:pPr>
+    <w:pStyle w:val='Body'/>
+  </w:pPr>
+  
+  <w:r>
+    <w:rPr></w:rPr>
+    <w:t xml:space='preserve'>Le present dossier s&apos;appuie sur les modules effectivement structures dans le projet: application mobile, application web Vue.js, API Node.js / Express, gestion des centres de sante, recherche geolocalisee, alertes d&apos;urgence, alertes de securite, plaintes usagers, evaluations de satisfaction, administration territoriale, validation des comptes et imports Excel/CSV.</w:t>
+  </w:r>
+</w:p>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>
+      <w:cols w:space="708"/>
+      <w:docGrid w:linePitch="360"/>
+    </w:sectPr>
+  </w:body>
+</w:document>

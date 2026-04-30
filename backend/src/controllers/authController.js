@@ -11,16 +11,19 @@ const SELF_REGISTER_ROLES = new Set([
   "DISTRICT",
   "CHEF_ETABLISSEMENT",
   "ETABLISSEMENT",
-  "SAPPEUR_POMPIER",
   "SAPEUR_POMPIER",
-  "SAMU"
+  "SAPEUR_POMPIER",
+  "SAMU",
+  "POLICE",
+  "GENDARMERIE",
+  "PROTECTION_CIVILE"
 ]);
 
 function normalizeRole(role) {
   const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
   if (!normalized) return "USER";
   if (normalized === "CHEF_ETABLISSEMENT") return "ETABLISSEMENT";
-  if (normalized === "SAPEUR_POMPIER") return "SAPPEUR_POMPIER";
+  if (normalized === "SAPEUR_POMPIER") return "SAPEUR_POMPIER";
   if (SELF_REGISTER_ROLES.has(normalized)) return normalized;
   return "USER";
 }

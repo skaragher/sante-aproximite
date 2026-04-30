@@ -3,61 +3,81 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { apiFetch } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { C, R, S, shared } from "../theme";
+
+const ACCENT = C.teal;
 
 const ESTABLISHMENT_TYPE_OPTIONS = [
   { label: "Confessionnel", value: "CONFESSIONNEL" },
-  { label: "Prive", value: "PRIVE" },
-  { label: "Publique", value: "PUBLIQUE" }
+  { label: "Prive",         value: "PRIVE" },
+  { label: "Publique",      value: "PUBLIQUE" }
 ];
 const LEVEL_OPTIONS = [
-  { label: "CHU", value: "CHU" },
-  { label: "CHR", value: "CHR" },
-  { label: "CH", value: "CH" },
-  { label: "CHS", value: "CHS" },
-  { label: "Clinique privee", value: "CLINIQUE_PRIVEE" },
-  { label: "CLCC", value: "CLCC" },
-  { label: "ESPC", value: "ESPC" },
-  { label: "Centre de sante", value: "CENTRE_SANTE" },
-  { label: "SSR", value: "SSR" },
-  { label: "EHPAD / USLD", value: "EHPAD_USLD" },
+  { label: "CHU",                     value: "CHU" },
+  { label: "CHR",                     value: "CHR" },
+  { label: "CH",                      value: "CH" },
+  { label: "CHS",                     value: "CHS" },
+  { label: "Clinique privee",         value: "CLINIQUE_PRIVEE" },
+  { label: "CLCC",                    value: "CLCC" },
+  { label: "ESPC",                    value: "ESPC" },
+  { label: "Centre de sante",         value: "CENTRE_SANTE" },
+  { label: "SSR",                     value: "SSR" },
+  { label: "EHPAD / USLD",           value: "EHPAD_USLD" },
   { label: "Centre de radiotherapie", value: "CENTRE_RADIOTHERAPIE" },
-  { label: "Centre de cardiologie", value: "CENTRE_CARDIOLOGIE" }
+  { label: "Centre de cardiologie",   value: "CENTRE_CARDIOLOGIE" }
 ];
+const AUTO_REFRESH_MS = 30 * 60 * 1000;
+
+const APPROVAL_CFG = {
+  APPROVED: { label: "APPROUVE",    bg: C.greenLight, color: C.green },
+  PENDING:  { label: "EN ATTENTE",  bg: C.amberLight, color: C.amber },
+  REJECTED: { label: "REJETE",      bg: C.redLight,   color: C.red }
+};
+
+function ApprovalBadge({ status }) {
+  const s = String(status || "").toUpperCase();
+  const cfg = APPROVAL_CFG[s] || { label: s || "NON CREE", bg: C.border, color: C.textMuted };
+  return (
+    <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
+    </View>
+  );
+}
 
 function parseServices(servicesCsv) {
-  return servicesCsv
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((name) => ({ name }));
+  return servicesCsv.split(",").map((item) => item.trim()).filter(Boolean).map((name) => ({ name }));
 }
 
 export function ChefScreen() {
   const { token } = useAuth();
-  const [centerId, setCenterId] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [centerId, setCenterId]                         = useState("");
+  const [centerApprovalStatus, setCenterApprovalStatus] = useState(null);
+  const [error, setError]                               = useState("");
+  const [message, setMessage]                           = useState("");
+  const [loading, setLoading]                           = useState(false);
+  const [complaintsLoading, setComplaintsLoading]       = useState(false);
+  const [complaintsList, setComplaintsList]             = useState([]);
+  const [complaintSummary, setComplaintSummary]         = useState(null);
+  const [complaintNotes, setComplaintNotes]             = useState({});
+  const [complaintActionLoadingId, setComplaintActionLoadingId] = useState("");
+  const [regions, setRegions]                           = useState([]);
+  const [districts, setDistricts]                       = useState([]);
+  const [geoLoading, setGeoLoading]                     = useState(false);
   const [form, setForm] = useState({
-    name: "",
-    address: "",
-    establishmentCode: "",
-    regionCode: "",
-    districtCode: "",
-    level: "CENTRE_SANTE",
-    establishmentType: "PUBLIQUE",
-    technicalPlatform: "",
-    servicesCsv: "",
-    latitude: "",
-    longitude: ""
+    name: "", address: "", establishmentCode: "",
+    regionCode: "", districtCode: "",
+    level: "CENTRE_SANTE", establishmentType: "PUBLIQUE",
+    technicalPlatform: "", servicesCsv: "",
+    latitude: "", longitude: ""
   });
 
   async function loadChefCenter({ silent = false } = {}) {
     try {
       const data = await apiFetch("/centers", { token });
       const center = data?.[0];
-      if (!center) return;
+      if (!center) { setCenterApprovalStatus(null); return; }
       setCenterId(center._id);
+      setCenterApprovalStatus(String(center.approvalStatus || "").toUpperCase() || null);
       setForm({
         name: center.name || "",
         address: center.address || "",
@@ -76,58 +96,97 @@ export function ChefScreen() {
     }
   }
 
-  useEffect(() => {
-    loadChefCenter();
-    const interval = setInterval(() => {
-      loadChefCenter({ silent: true }).catch(() => {});
-    }, 30000);
+  async function loadComplaintsData({ silent = false } = {}) {
+    if (!token) return;
+    if (String(centerApprovalStatus || "").toUpperCase() !== "APPROVED") {
+      setComplaintsList([]); setComplaintSummary(null); return;
+    }
+    try {
+      setComplaintsLoading(true);
+      const [complaintsData, summaryData] = await Promise.all([
+        apiFetch("/complaints", { token }),
+        apiFetch("/complaints/summary", { token })
+      ]);
+      setComplaintsList(Array.isArray(complaintsData) ? complaintsData : []);
+      setComplaintSummary(summaryData || null);
+    } catch (err) {
+      if (!silent) setError(err.message);
+    } finally {
+      setComplaintsLoading(false);
+    }
+  }
 
+  async function loadRegions({ silent = false } = {}) {
+    if (!token) return;
+    try {
+      setGeoLoading(true);
+      const data = await apiFetch("/geo/regions", { token });
+      setRegions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      if (!silent) setError(err.message);
+    } finally {
+      setGeoLoading(false);
+    }
+  }
+
+  async function loadDistricts(regionCode, { silent = false } = {}) {
+    if (!token || !regionCode) { setDistricts([]); return; }
+    try {
+      const data = await apiFetch(`/geo/districts?regionCode=${encodeURIComponent(regionCode)}`, { token });
+      setDistricts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      if (!silent) setError(err.message);
+      setDistricts([]);
+    }
+  }
+
+  async function refreshAll({ silent = false } = {}) {
+    const regionCode = String(form.regionCode || "").trim().toUpperCase();
+    await Promise.all([loadChefCenter({ silent }), loadRegions({ silent }), loadDistricts(regionCode, { silent })]);
+  }
+
+  useEffect(() => {
+    refreshAll({ silent: true }).catch(() => {});
+    const interval = setInterval(() => refreshAll({ silent: true }).catch(() => {}), AUTO_REFRESH_MS);
     return () => clearInterval(interval);
   }, [token]);
+
+  useEffect(() => {
+    loadDistricts(String(form.regionCode || "").trim().toUpperCase(), { silent: true }).catch(() => {});
+  }, [token, form.regionCode]);
+
+  useEffect(() => {
+    loadComplaintsData({ silent: true }).catch(() => {});
+  }, [token, centerApprovalStatus]);
 
   async function getCurrentPosition() {
     setError("");
     const perm = await Location.requestForegroundPermissionsAsync();
-    if (perm.status !== "granted") {
-      setError("Permission de localisation refusee");
-      return;
-    }
-
+    if (perm.status !== "granted") { setError("Permission de localisation refusee"); return; }
     const current = await Location.getCurrentPositionAsync({});
-    setForm((prev) => ({
-      ...prev,
-      latitude: String(current.coords.latitude),
-      longitude: String(current.coords.longitude)
-    }));
+    setForm((prev) => ({ ...prev, latitude: String(current.coords.latitude), longitude: String(current.coords.longitude) }));
   }
 
   async function createCenter() {
-    setError("");
-    setMessage("");
-    setLoading(true);
+    setError(""); setMessage(""); setLoading(true);
     try {
       const result = await apiFetch(centerId ? `/centers/${centerId}` : "/centers", {
         token,
         method: centerId ? "PUT" : "POST",
         body: {
-          name: form.name,
-          address: form.address,
+          name: form.name, address: form.address,
           establishmentCode: form.establishmentCode,
           regionCode: String(form.regionCode || "").trim().toUpperCase(),
           districtCode: String(form.districtCode || "").trim().toUpperCase() || null,
-          level: form.level,
-          establishmentType: form.establishmentType,
+          level: form.level, establishmentType: form.establishmentType,
           technicalPlatform: form.technicalPlatform,
-          latitude: Number(form.latitude),
-          longitude: Number(form.longitude),
+          latitude: Number(form.latitude), longitude: Number(form.longitude),
           services: parseServices(form.servicesCsv)
         }
       });
-
-      if (result?.queued) {
-        setMessage(result.message || "Action enregistree hors ligne.");
-      } else {
-        setMessage(centerId ? "Centre mis a jour et envoye en validation" : "Centre cree et envoye en validation");
+      setMessage(result?.queued ? result.message || "Action enregistree hors ligne." : centerId ? "Centre mis a jour et envoye en validation" : "Centre cree et envoye en validation");
+      if (!result?.queued) {
+        await refreshAll({ silent: true });
       }
     } catch (err) {
       setError(err.message);
@@ -136,154 +195,268 @@ export function ChefScreen() {
     }
   }
 
+  async function addComplaintExplanation(complaintId) {
+    const note = String(complaintNotes[complaintId] || "").trim();
+    if (!note) { setError("Saisis une explication avant de valider."); return; }
+    setError(""); setMessage(""); setComplaintActionLoadingId(String(complaintId));
+    try {
+      await apiFetch(`/complaints/${complaintId}/explanation`, { token, method: "POST", body: { message: note } });
+      setComplaintNotes((prev) => ({ ...prev, [complaintId]: "" }));
+      setMessage("Explication enregistree");
+      await loadComplaintsData({ silent: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setComplaintActionLoadingId("");
+    }
+  }
+
+  function formatComplaintStatus(status) {
+    if (status === "NEW")         return "NOUVELLE";
+    if (status === "IN_PROGRESS") return "EN COURS";
+    if (status === "RESOLVED")    return "RESOLUE";
+    if (status === "REJECTED")    return "REJETEE";
+    return status || "-";
+  }
+
+  const f = form;
+  function setF(key, v) { setForm((p) => ({ ...p, [key]: v })); }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Creer un centre de sante</Text>
 
-      <TextInput style={styles.input} placeholder="Nom du centre" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} />
-      <TextInput style={styles.input} placeholder="Adresse" value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} />
-      <TextInput
-        style={styles.input}
-        placeholder="Code etablissement (optionnel)"
-        autoCapitalize="characters"
-        value={form.establishmentCode}
-        onChangeText={(v) => setForm({ ...form, establishmentCode: v })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Region (obligatoire)"
-        autoCapitalize="characters"
-        value={form.regionCode}
-        onChangeText={(v) => setForm({ ...form, regionCode: v })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="District (optionnel)"
-        autoCapitalize="characters"
-        value={form.districtCode}
-        onChangeText={(v) => setForm({ ...form, districtCode: v })}
-      />
-      <Text style={styles.groupLabel}>Niveau d'etablissement</Text>
-      <View style={styles.typeGroup}>
-        {LEVEL_OPTIONS.map((option) => (
-          <Pressable
-            key={option.value}
-            style={[styles.typeChip, form.level === option.value ? styles.typeChipActive : null]}
-            onPress={() => setForm({ ...form, level: option.value })}
-          >
-            <Text style={[styles.typeChipText, form.level === option.value ? styles.typeChipTextActive : null]}>
-              {option.label}
-            </Text>
-          </Pressable>
-        ))}
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={[styles.headerIcon, { backgroundColor: ACCENT + "18" }]}>
+          <Text style={styles.headerEmoji}>🏥</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>{centerId ? "Mon centre de sante" : "Creer un centre"}</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.headerSub}>Statut: </Text>
+            <ApprovalBadge status={centerApprovalStatus} />
+          </View>
+        </View>
       </View>
-      <Text style={styles.groupLabel}>Type d'etablissement</Text>
-      <View style={styles.typeGroup}>
-        {ESTABLISHMENT_TYPE_OPTIONS.map((option) => (
-          <Pressable
-            key={option.value}
-            style={[styles.typeChip, form.establishmentType === option.value ? styles.typeChipActive : null]}
-            onPress={() => setForm({ ...form, establishmentType: option.value })}
-          >
-            <Text style={[styles.typeChipText, form.establishmentType === option.value ? styles.typeChipTextActive : null]}>
-              {option.label}
-            </Text>
-          </Pressable>
-        ))}
+
+      {/* Infos generales */}
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>INFORMATIONS GENERALES</Text>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Nom du centre</Text>
+          <TextInput style={shared.input} placeholder="Nom du centre" value={f.name} onChangeText={(v) => setF("name", v)} />
+        </View>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Adresse</Text>
+          <TextInput style={shared.input} placeholder="Adresse complete" value={f.address} onChangeText={(v) => setF("address", v)} />
+        </View>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Code etablissement (optionnel)</Text>
+          <TextInput style={shared.input} placeholder="Ex: ABIDJAN-001" autoCapitalize="characters" value={f.establishmentCode} onChangeText={(v) => setF("establishmentCode", v)} />
+        </View>
       </View>
-      <TextInput
-        style={[styles.input, styles.inputMultiline]}
-        multiline
-        placeholder="Plateau technique"
-        value={form.technicalPlatform}
-        onChangeText={(v) => setForm({ ...form, technicalPlatform: v })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Services (Urgences, Radiologie, ... )"
-        value={form.servicesCsv}
-        onChangeText={(v) => setForm({ ...form, servicesCsv: v })}
-      />
+
+      {/* Localisation */}
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>LOCALISATION</Text>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Region</Text>
+          <TextInput style={shared.input} placeholder="Code region (ex: ABIDJAN)" autoCapitalize="characters" value={f.regionCode} onChangeText={(v) => { setF("regionCode", v); setF("districtCode", ""); }} />
+        </View>
+        {regions.length ? (
+          <View>
+            <Text style={styles.fieldLabel}>Selection rapide region</Text>
+            <View style={styles.chipGroup}>
+              {regions.map((region) => (
+                <Pressable key={region.code} style={[styles.chip, f.regionCode === region.code && styles.chipActive]} onPress={() => setForm((p) => ({ ...p, regionCode: region.code, districtCode: "" }))}>
+                  <Text style={[styles.chipText, f.regionCode === region.code && styles.chipTextActive]}>{region.code}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+        {geoLoading ? <Text style={styles.geoLoading}>Chargement...</Text> : null}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>District (optionnel)</Text>
+          <TextInput style={shared.input} placeholder="Code district" autoCapitalize="characters" value={f.districtCode} onChangeText={(v) => setF("districtCode", v)} />
+        </View>
+        {districts.length ? (
+          <View>
+            <Text style={styles.fieldLabel}>Selection rapide district</Text>
+            <View style={styles.chipGroup}>
+              {districts.map((district) => (
+                <Pressable key={district.code} style={[styles.chip, f.districtCode === district.code && styles.chipActive]} onPress={() => setForm((p) => ({ ...p, districtCode: district.code }))}>
+                  <Text style={[styles.chipText, f.districtCode === district.code && styles.chipTextActive]}>{district.code}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Classification */}
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>CLASSIFICATION</Text>
+        <Text style={styles.fieldLabel}>Niveau d'etablissement</Text>
+        <View style={styles.chipGroup}>
+          {LEVEL_OPTIONS.map((option) => (
+            <Pressable key={option.value} style={[styles.chip, f.level === option.value && styles.chipActive]} onPress={() => setF("level", option.value)}>
+              <Text style={[styles.chipText, f.level === option.value && styles.chipTextActive]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Type d'etablissement</Text>
+        <View style={styles.chipGroup}>
+          {ESTABLISHMENT_TYPE_OPTIONS.map((option) => (
+            <Pressable key={option.value} style={[styles.chip, f.establishmentType === option.value && styles.chipActive]} onPress={() => setF("establishmentType", option.value)}>
+              <Text style={[styles.chipText, f.establishmentType === option.value && styles.chipTextActive]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Services */}
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>SERVICES & PLATEAU TECHNIQUE</Text>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Plateau technique</Text>
+          <TextInput style={[shared.input, shared.textArea]} multiline placeholder="Plateau technique" value={f.technicalPlatform} onChangeText={(v) => setF("technicalPlatform", v)} />
+        </View>
+        <View style={styles.fieldGroup}>
+          <Text style={styles.fieldLabel}>Services (separes par virgule)</Text>
+          <TextInput style={shared.input} placeholder="Urgences, Radiologie, Pediatrie..." value={f.servicesCsv} onChangeText={(v) => setF("servicesCsv", v)} />
+        </View>
+      </View>
+
+      {/* GPS */}
+      <View style={styles.card}>
+        <Text style={styles.sectionLabel}>COORDONNEES GPS</Text>
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldLabel}>Latitude</Text>
+            <TextInput style={shared.input} keyboardType="numeric" placeholder="5.3600" value={f.latitude} onChangeText={(v) => setF("latitude", v)} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldLabel}>Longitude</Text>
+            <TextInput style={shared.input} keyboardType="numeric" placeholder="-4.0083" value={f.longitude} onChangeText={(v) => setF("longitude", v)} />
+          </View>
+        </View>
+        <Pressable style={styles.outlineBtn} onPress={getCurrentPosition}>
+          <Text style={styles.outlineBtnText}>📍 Utiliser ma position GPS</Text>
+        </Pressable>
+      </View>
+
+      {message ? <Text style={shared.success}>{message}</Text> : null}
+      {error   ? <Text style={shared.error}>{error}</Text>     : null}
 
       <View style={styles.row}>
-        <TextInput
-          style={[styles.input, styles.flex]}
-          keyboardType="numeric"
-          placeholder="Latitude"
-          value={form.latitude}
-          onChangeText={(v) => setForm({ ...form, latitude: v })}
-        />
-        <TextInput
-          style={[styles.input, styles.flex]}
-          keyboardType="numeric"
-          placeholder="Longitude"
-          value={form.longitude}
-          onChangeText={(v) => setForm({ ...form, longitude: v })}
-        />
+        <Pressable style={styles.outlineBtn} onPress={() => { setError(""); setMessage(""); refreshAll({ silent: false }).catch(() => {}); loadComplaintsData({ silent: true }).catch(() => {}); }}>
+          <Text style={styles.outlineBtnText}>Actualiser</Text>
+        </Pressable>
+        <Pressable style={[styles.primaryBtn, { flex: 1 }, loading && { opacity: 0.6 }]} onPress={createCenter} disabled={loading}>
+          <Text style={styles.primaryBtnText}>{loading ? "Enregistrement..." : centerId ? "Mettre a jour" : "Enregistrer le centre"}</Text>
+        </Pressable>
       </View>
 
-      <Pressable style={styles.secondaryButton} onPress={getCurrentPosition}>
-        <Text style={styles.secondaryButtonText}>Utiliser ma position</Text>
-      </Pressable>
+      {/* Panel plaintes */}
+      {centerApprovalStatus === "APPROVED" ? (
+        <View style={styles.complaintsPanel}>
+          <Text style={styles.sectionLabel}>SUIVI DU CENTRE APPROUVE</Text>
 
-      {message ? <Text style={styles.success}>{message}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+          {complaintSummary ? (
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{complaintSummary.ratingAverage ?? "-"}</Text>
+                <Text style={styles.statLabel}>Note moy.</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{complaintSummary.satisfactionRate == null ? "-" : `${complaintSummary.satisfactionRate}%`}</Text>
+                <Text style={styles.statLabel}>Satisfaction</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{complaintSummary.complaints?.total ?? 0}</Text>
+                <Text style={styles.statLabel}>Plaintes</Text>
+              </View>
+            </View>
+          ) : null}
 
-      <Pressable style={styles.primaryButton} onPress={createCenter} disabled={loading}>
-        <Text style={styles.primaryButtonText}>
-          {loading ? "Enregistrement..." : centerId ? "Mettre a jour" : "Enregistrer"}
-        </Text>
-      </Pressable>
+          {complaintsLoading ? <Text style={styles.geoLoading}>Chargement des plaintes...</Text> : null}
+          {!complaintsLoading && complaintsList.length === 0 ? <Text style={shared.hint}>Aucune plainte pour votre centre.</Text> : null}
+
+          {complaintsList.map((item) => (
+            <View key={item.id} style={styles.complaintCard}>
+              <View style={styles.complaintTop}>
+                <Text style={styles.complaintSubject}>{item.subject}</Text>
+                <View style={[styles.badge, { backgroundColor: item.status === "RESOLVED" ? C.greenLight : C.primaryLight }]}>
+                  <Text style={[styles.badgeText, { color: item.status === "RESOLVED" ? C.green : C.primary }]}>
+                    {formatComplaintStatus(item.status)}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.complaintBody}>{item.message}</Text>
+              <TextInput
+                style={[shared.input, shared.textArea]}
+                multiline
+                placeholder="Ajouter une explication..."
+                value={complaintNotes[item.id] || ""}
+                onChangeText={(value) => setComplaintNotes((prev) => ({ ...prev, [item.id]: value }))}
+              />
+              <Pressable style={[styles.outlineBtn, complaintActionLoadingId === String(item.id) && { opacity: 0.5 }]} onPress={() => addComplaintExplanation(item.id)} disabled={complaintActionLoadingId === String(item.id)}>
+                <Text style={styles.outlineBtnText}>{complaintActionLoadingId === String(item.id) ? "..." : "Ajouter explication"}</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, gap: 10, paddingBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
-  input: {
-    backgroundColor: "#fff",
-    borderColor: "#d0e3ec",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12
+  content:   { padding: 16, gap: 14, paddingBottom: 32 },
+
+  header:      { flexDirection: "row", alignItems: "center", gap: 14 },
+  headerIcon:  { width: 52, height: 52, borderRadius: R.md, alignItems: "center", justifyContent: "center" },
+  headerEmoji: { fontSize: 26 },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: C.textDark },
+  headerRow:   { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  headerSub:   { fontSize: 13, color: C.textMuted },
+
+  card: {
+    backgroundColor: C.surface, borderRadius: R.md,
+    borderWidth: 1, borderColor: C.border,
+    borderLeftWidth: 3, borderLeftColor: ACCENT,
+    padding: 14, gap: 10, ...S.sm,
   },
-  inputMultiline: { minHeight: 90, textAlignVertical: "top" },
-  groupLabel: { color: "#0f172a", fontWeight: "600", marginTop: 2 },
-  typeGroup: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  typeChip: {
-    borderWidth: 1,
-    borderColor: "#d0e3ec",
-    backgroundColor: "#fff",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8
-  },
-  typeChipActive: {
-    backgroundColor: "#0b7285",
-    borderColor: "#0b7285"
-  },
-  typeChipText: { color: "#0f172a", fontWeight: "600" },
-  typeChipTextActive: { color: "#fff" },
-  row: { flexDirection: "row", gap: 8 },
-  flex: { flex: 1 },
-  secondaryButton: {
-    borderColor: "#0b7285",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: "center"
-  },
-  secondaryButtonText: { color: "#0b7285", fontWeight: "600" },
-  primaryButton: {
-    backgroundColor: "#0b7285",
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center"
-  },
-  primaryButtonText: { color: "#fff", fontWeight: "700" },
-  error: { color: "#b42318" },
-  success: { color: "#067647" }
+  sectionLabel: { fontSize: 10, fontWeight: "800", color: C.textMuted, letterSpacing: 1 },
+  fieldGroup:   { gap: 4 },
+  fieldLabel:   { fontSize: 12, fontWeight: "700", color: C.textMed },
+  geoLoading:   { color: ACCENT, fontWeight: "600", fontSize: 13 },
+
+  chipGroup:      { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip:           { borderWidth: 1.5, borderColor: C.border, borderRadius: R.full, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: C.surfaceAlt },
+  chipActive:     { backgroundColor: ACCENT, borderColor: ACCENT },
+  chipText:       { color: C.textMed, fontWeight: "600", fontSize: 13 },
+  chipTextActive: { color: "#fff" },
+
+  row:            { flexDirection: "row", gap: 10, alignItems: "center" },
+  outlineBtn:     { borderWidth: 1.5, borderColor: ACCENT, borderRadius: R.sm, paddingVertical: 10, paddingHorizontal: 14, alignItems: "center" },
+  outlineBtnText: { color: ACCENT, fontWeight: "700", fontSize: 13 },
+  primaryBtn:     { backgroundColor: ACCENT, borderRadius: R.sm, paddingVertical: 12, alignItems: "center", ...S.sm },
+  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
+  badge:     { borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 10, fontWeight: "800" },
+
+  complaintsPanel: { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 14, gap: 12 },
+  statsRow:  { flexDirection: "row", gap: 10 },
+  statCard:  { flex: 1, backgroundColor: ACCENT + "15", borderRadius: R.sm, borderWidth: 1, borderColor: ACCENT + "30", padding: 12, alignItems: "center", gap: 2 },
+  statValue: { fontSize: 22, fontWeight: "800", color: ACCENT },
+  statLabel: { fontSize: 11, color: C.textMuted, textAlign: "center" },
+
+  complaintCard:    { backgroundColor: C.surfaceAlt, borderRadius: R.sm, borderWidth: 1, borderColor: C.border, padding: 12, gap: 8 },
+  complaintTop:     { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  complaintSubject: { fontWeight: "700", color: C.textDark, flex: 1, marginRight: 8 },
+  complaintBody:    { color: C.textMuted, fontSize: 13 },
 });

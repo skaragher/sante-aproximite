@@ -48,6 +48,19 @@ function isAdminRole(role) {
   return ADMIN_ROLES.has(role);
 }
 
+function getEffectiveRequestRoles(req) {
+  const roles = Array.isArray(req.user?.roles)
+    ? req.user.roles.map((value) => String(value || "").trim().toUpperCase()).filter(Boolean)
+    : [];
+  const primary = String(req.user?.role || "").trim().toUpperCase();
+  return [...new Set([...roles, primary].filter(Boolean))];
+}
+
+function hasRequestRole(req, allowedRoles) {
+  const effective = getEffectiveRequestRoles(req);
+  return effective.some((role) => allowedRoles.has(role));
+}
+
 function normalizeGeoCode(value) {
   if (typeof value !== "string") return null;
   const cleaned = value.trim().toUpperCase();
@@ -90,6 +103,17 @@ async function validateRegionDistrict(regionCode, districtCode, queryable = pool
 
 async function getRequesterScope(req) {
   const role = String(req.user?.role || "").toUpperCase();
+  const normalizedUserRoles = Array.isArray(req.user?.roles)
+    ? req.user.roles.map((value) => String(value || "").trim().toUpperCase()).filter(Boolean)
+    : [];
+  const scopePriority = [
+    "REGULATOR",
+    "NATIONAL",
+    "REGION",
+    "DISTRICT",
+    "CHEF_ETABLISSEMENT",
+    "ETABLISSEMENT"
+  ];
   const userId = Number(req.user?.id);
   if (!Number.isInteger(userId) || userId <= 0) {
     return {
@@ -124,8 +148,11 @@ async function getRequesterScope(req) {
   }
 
   const row = found.rows[0];
+  const dbRole = String(row.role || role).toUpperCase();
+  const combinedRoles = [...new Set([...normalizedUserRoles, role, dbRole].filter(Boolean))];
+  const scopedRole = scopePriority.find((value) => combinedRoles.includes(value)) || dbRole;
   return {
-    role: String(row.role || role).toUpperCase(),
+    role: scopedRole,
     userId: Number(row.id),
     regionCode: normalizeGeoCode(row.region_code),
     districtCode: normalizeGeoCode(row.district_code),
@@ -134,8 +161,12 @@ async function getRequesterScope(req) {
   };
 }
 
-function applyCenterScope(whereParts, params, scope, centerAlias = "hc") {
+function applyCenterScope(whereParts, params, scope, centerAlias = "hc", options = {}) {
+  const onlyApprovedForEstablishment = options?.onlyApprovedForEstablishment === true;
   if (scope.role === "ETABLISSEMENT" || scope.role === "CHEF_ETABLISSEMENT") {
+    if (onlyApprovedForEstablishment) {
+      whereParts.push(`${centerAlias}.approval_status = 'APPROVED'`);
+    }
     if (scope.centerId) {
       whereParts.push(`${centerAlias}.id = $${params.length + 1}`);
       params.push(Number(scope.centerId));
@@ -169,10 +200,11 @@ function applyCenterScope(whereParts, params, scope, centerAlias = "hc") {
   }
 }
 
-async function canViewCenterByScope(scope, centerId) {
+async function canViewCenterByScope(scope, centerId, options = {}) {
+  const onlyApprovedForEstablishment = options?.onlyApprovedForEstablishment === true;
   const centerResult = await pool.query(
     `
-      SELECT id, created_by, region_code, district_code, establishment_code
+      SELECT id, created_by, region_code, district_code, establishment_code, approval_status
       FROM health_centers
       WHERE id = $1
       LIMIT 1;
@@ -188,6 +220,9 @@ async function canViewCenterByScope(scope, centerId) {
     return { exists: true, allowed: true };
   }
   if (scope.role === "ETABLISSEMENT" || scope.role === "CHEF_ETABLISSEMENT") {
+    if (onlyApprovedForEstablishment && String(center.approval_status || "").toUpperCase() !== "APPROVED") {
+      return { exists: true, allowed: false };
+    }
     if (scope.centerId) {
       return { exists: true, allowed: Number(center.id) === Number(scope.centerId) };
     }
@@ -296,6 +331,9 @@ function mapCenterRow(row) {
     },
     createdBy: String(row.created_by),
     approvalStatus: row.approval_status || "PENDING",
+    isActive: row.is_active !== false,
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null,
     ratingAverage,
     ratingCount,
     satisfactionRate,
@@ -571,7 +609,8 @@ export async function addService(req, res) {
 export async function getNearbyCenters(req, res) {
   const lat = toNumber(req.query.latitude);
   const lon = toNumber(req.query.longitude);
-  const radiusKm = toNumber(req.query.radiusKm) ?? 30;
+  const requestedRadiusKm = toNumber(req.query.radiusKm);
+  const radiusKm = requestedRadiusKm == null ? 30 : Math.min(700, Math.max(1, requestedRadiusKm));
   const viewerId = Number(req.user.id);
   const scope = await getRequesterScope(req);
 
@@ -579,14 +618,62 @@ export async function getNearbyCenters(req, res) {
     return res.status(400).json({ message: "latitude et longitude sont obligatoires" });
   }
 
+  let enforceScopedFilter = true;
+  if (isEtablissementRole(scope.role)) {
+    if (scope.centerId) {
+      const centerResult = await pool.query(
+        `
+          SELECT approval_status
+          FROM health_centers
+          WHERE id = $1
+          LIMIT 1;
+        `,
+        [Number(scope.centerId)]
+      );
+      enforceScopedFilter = centerResult.rowCount > 0 && centerResult.rows[0].approval_status === "APPROVED";
+    } else if (scope.establishmentCode) {
+      const centerResult = await pool.query(
+        `
+          SELECT 1
+          FROM health_centers
+          WHERE upper(establishment_code) = $1
+            AND approval_status = 'APPROVED'
+          LIMIT 1;
+        `,
+        [scope.establishmentCode]
+      );
+      enforceScopedFilter = centerResult.rowCount > 0;
+    } else {
+      const centerResult = await pool.query(
+        `
+          SELECT 1
+          FROM health_centers
+          WHERE created_by = $1
+            AND approval_status = 'APPROVED'
+          LIMIT 1;
+        `,
+        [Number(scope.userId)]
+      );
+      enforceScopedFilter = centerResult.rowCount > 0;
+    }
+  }
+
   let filterClause = "WHERE cwd.distance_km <= $3";
   const params = [lat, lon, radiusKm, viewerId];
   const scopeParts = [];
-  applyCenterScope(scopeParts, params, scope, "cwd");
-  if (scopeParts.length) {
+  if (!isEtablissementRole(scope.role) || enforceScopedFilter) {
+    applyCenterScope(scopeParts, params, scope, "cwd");
+  }
+  const shouldUsePublicVisibilityFilter =
+    !isAdminRole(scope.role) && (!isEtablissementRole(scope.role) || !enforceScopedFilter);
+  if (scopeParts.length && (!isEtablissementRole(scope.role) || enforceScopedFilter)) {
     filterClause += ` AND ${scopeParts.join(" AND ")}`;
-  } else if (!isAdminRole(req.user.role) && !isEtablissementRole(req.user.role)) {
-    filterClause += " AND cwd.approval_status = 'APPROVED'";
+  } else if (shouldUsePublicVisibilityFilter) {
+    filterClause += " AND cwd.approval_status IN ('APPROVED', 'PENDING')";
+    if (isEtablissementRole(scope.role) && !enforceScopedFilter && Number.isInteger(Number(scope.userId))) {
+      filterClause += ` AND NOT (cwd.created_by = $${params.length + 1} AND cwd.approval_status = 'PENDING')`;
+      params.push(Number(scope.userId));
+    }
   }
 
   const result = await pool.query(
@@ -616,6 +703,7 @@ export async function getNearbyCenters(req, res) {
             )
           ) AS distance_km
         FROM health_centers hc
+        WHERE hc.is_active = TRUE
       )
       SELECT
         cwd.id,
@@ -685,15 +773,19 @@ export async function getNearbyCenters(req, res) {
 export async function getAllCenters(req, res) {
   const viewerId = Number(req.user.id);
   const scope = await getRequesterScope(req);
-  let whereClause = "";
+  const includeInactiveParam = String(req.query?.includeInactive || "").trim().toLowerCase();
+  const includeInactive = ["1", "true", "yes"].includes(includeInactiveParam);
+  const canIncludeInactive = includeInactive && (isAdminRole(scope.role) || isEtablissementRole(scope.role));
   const params = [viewerId];
   const whereParts = [];
   applyCenterScope(whereParts, params, scope, "hc");
-  if (whereParts.length) {
-    whereClause = `WHERE ${whereParts.join(" AND ")}`;
-  } else if (!isAdminRole(req.user.role) && !isEtablissementRole(req.user.role)) {
-    whereClause = "WHERE hc.approval_status = 'APPROVED'";
+  if (!canIncludeInactive) {
+    whereParts.push("hc.is_active = TRUE");
   }
+  if (!isAdminRole(scope.role) && !isEtablissementRole(scope.role)) {
+    whereParts.push("hc.approval_status = 'APPROVED'");
+  }
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
   const result = await pool.query(
     `
@@ -711,6 +803,9 @@ export async function getAllCenters(req, res) {
         hc.longitude,
         hc.created_by,
         hc.approval_status,
+        hc.is_active,
+        hc.created_at,
+        hc.updated_at,
         (
           SELECT ROUND(AVG(cr.rating)::numeric, 1)
           FROM center_ratings cr
@@ -758,6 +853,90 @@ export async function getAllCenters(req, res) {
   );
 
   return res.json(result.rows.map(mapCenterRow));
+}
+
+export async function getCentersSync(req, res) {
+  const viewerId = Number(req.user.id);
+  const sinceRaw = typeof req.query?.since === "string" ? req.query.since.trim() : "";
+  const sinceDate = sinceRaw ? new Date(sinceRaw) : null;
+  const hasValidSince = sinceDate instanceof Date && !Number.isNaN(sinceDate?.getTime?.());
+  const params = [viewerId];
+  const whereParts = ["hc.is_active = TRUE", "hc.approval_status = 'APPROVED'"];
+
+  if (hasValidSince) {
+    whereParts.push(`hc.updated_at > $${params.length + 1}`);
+    params.push(sinceDate.toISOString());
+  }
+
+  const result = await pool.query(
+    `
+      SELECT
+        hc.id,
+        hc.name,
+        hc.address,
+        hc.establishment_code,
+        hc.level,
+        hc.establishment_type,
+        hc.technical_platform,
+        hc.region_code,
+        hc.district_code,
+        hc.latitude,
+        hc.longitude,
+        hc.created_by,
+        hc.approval_status,
+        hc.is_active,
+        hc.created_at,
+        hc.updated_at,
+        (
+          SELECT ROUND(AVG(cr.rating)::numeric, 1)
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.rating IS NOT NULL
+        ) AS rating_average,
+        (
+          SELECT COUNT(*)
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.rating IS NOT NULL
+        ) AS rating_count,
+        (
+          SELECT ROUND(
+            100.0 * SUM(CASE WHEN cr.satisfaction = 'SATISFIED' THEN 1 ELSE 0 END)
+            / NULLIF(COUNT(cr.satisfaction), 0),
+            1
+          )
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.satisfaction IS NOT NULL
+        ) AS satisfaction_rate,
+        (
+          SELECT cr.rating
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.user_id = $1
+          LIMIT 1
+        ) AS my_rating,
+        (
+          SELECT cr.satisfaction
+          FROM center_ratings cr
+          WHERE cr.center_id = hc.id AND cr.user_id = $1
+          LIMIT 1
+        ) AS my_satisfaction,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object('name', s.name, 'description', s.description)
+            ORDER BY s.id
+          )
+          FROM health_center_services s
+          WHERE s.center_id = hc.id
+        ), '[]'::json) AS services
+      FROM health_centers hc
+      WHERE ${whereParts.join(" AND ")}
+      ORDER BY hc.updated_at ASC, hc.id ASC;
+    `,
+    params
+  );
+
+  return res.json({
+    serverTime: new Date().toISOString(),
+    centers: result.rows.map(mapCenterRow)
+  });
 }
 
 export async function importCenters(req, res) {
@@ -1119,6 +1298,220 @@ export async function updateCenter(req, res) {
   }
 }
 
+export async function updateCenterByAdmin(req, res) {
+  const centerId = Number(req.params.id);
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const {
+    name,
+    address,
+    establishmentCode,
+    level,
+    establishmentType,
+    technicalPlatform,
+    services = [],
+    regionCode,
+    districtCode,
+    latitude,
+    longitude
+  } = req.body;
+
+  const lat = toNumber(latitude);
+  const lon = toNumber(longitude);
+  const normalizedCode = normalizeEstablishmentCode(establishmentCode);
+  const normalizedLevel = normalizeCenterLevel(level);
+  const normalizedType = normalizeEstablishmentType(establishmentType);
+  const normalizedRegionCode = normalizeGeoCode(regionCode);
+  const normalizedDistrictCode = normalizeGeoCode(districtCode);
+
+  if (!name || !address || !normalizedRegionCode || !technicalPlatform || lat === null || lon === null) {
+    return res.status(400).json({
+      message: "name, address, regionCode, technicalPlatform, latitude et longitude sont obligatoires"
+    });
+  }
+  if (!normalizedLevel || !normalizedType) {
+    return res.status(400).json({ message: "level ou establishmentType invalide" });
+  }
+
+  const scope = await getRequesterScope(req);
+  const access = await canViewCenterByScope(scope, centerId);
+  if (!access.exists) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+  if (!access.allowed) {
+    return res.status(403).json({ message: "Acces refuse a ce centre" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const geoValidation = await validateRegionDistrict(
+      normalizedRegionCode,
+      normalizedDistrictCode,
+      client
+    );
+    if (!geoValidation.ok) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ message: geoValidation.message });
+    }
+
+    await client.query(
+      `
+        UPDATE health_centers
+        SET
+          name = $2,
+          address = $3,
+          establishment_code = $4,
+          level = $5,
+          establishment_type = $6,
+          technical_platform = $7,
+          region_code = $8,
+          district_code = $9,
+          latitude = $10,
+          longitude = $11,
+          updated_at = NOW()
+        WHERE id = $1;
+      `,
+      [
+        centerId,
+        name.trim(),
+        address.trim(),
+        normalizedCode,
+        normalizedLevel,
+        normalizedType,
+        technicalPlatform.trim(),
+        normalizedRegionCode,
+        normalizedDistrictCode,
+        lat,
+        lon
+      ]
+    );
+
+    await client.query("DELETE FROM health_center_services WHERE center_id = $1", [centerId]);
+    const normalizedServices = normalizeServices(services);
+    for (const service of normalizedServices) {
+      await client.query(
+        `
+          INSERT INTO health_center_services (center_id, name, description)
+          VALUES ($1, $2, $3);
+        `,
+        [centerId, service.name, service.description || null]
+      );
+    }
+
+    const updated = await client.query(
+      `
+        SELECT
+          hc.id,
+          hc.name,
+          hc.address,
+          hc.establishment_code,
+          hc.level,
+          hc.establishment_type,
+          hc.technical_platform,
+          hc.region_code,
+          hc.district_code,
+          hc.latitude,
+          hc.longitude,
+          hc.created_by,
+          hc.approval_status,
+          hc.is_active,
+          COALESCE((
+            SELECT json_agg(
+              json_build_object('name', s.name, 'description', s.description)
+              ORDER BY s.id
+            )
+            FROM health_center_services s
+            WHERE s.center_id = hc.id
+          ), '[]'::json) AS services
+        FROM health_centers hc
+        WHERE hc.id = $1;
+      `,
+      [centerId]
+    );
+
+    await client.query("COMMIT");
+    return res.json(mapCenterRow(updated.rows[0]));
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function setCenterActiveByAdmin(req, res) {
+  const centerId = Number(req.params.id);
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const isActive = req.body?.isActive;
+  if (typeof isActive !== "boolean") {
+    return res.status(400).json({ message: "isActive (boolean) est obligatoire" });
+  }
+
+  const scope = await getRequesterScope(req);
+  const access = await canViewCenterByScope(scope, centerId);
+  if (!access.exists) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+  if (!access.allowed) {
+    return res.status(403).json({ message: "Acces refuse a ce centre" });
+  }
+
+  const updated = await pool.query(
+    `
+      UPDATE health_centers
+      SET is_active = $2, updated_at = NOW()
+      WHERE id = $1
+      RETURNING
+        id,
+        name,
+        address,
+        establishment_code,
+        level,
+        establishment_type,
+        technical_platform,
+        region_code,
+        district_code,
+        latitude,
+        longitude,
+        created_by,
+        approval_status,
+        is_active;
+    `,
+    [centerId, isActive]
+  );
+
+  if (updated.rowCount === 0) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+
+  return res.json(mapCenterRow({ ...updated.rows[0], services: [] }));
+}
+
+export async function deleteCenterByAdmin(req, res) {
+  const centerId = Number(req.params.id);
+  if (!Number.isInteger(centerId) || centerId <= 0) {
+    return res.status(400).json({ message: "ID de centre invalide" });
+  }
+
+  const scope = await getRequesterScope(req);
+  const access = await canViewCenterByScope(scope, centerId);
+  if (!access.exists) {
+    return res.status(404).json({ message: "Centre introuvable" });
+  }
+  if (!access.allowed) {
+    return res.status(403).json({ message: "Acces refuse a ce centre" });
+  }
+
+  await pool.query("DELETE FROM health_centers WHERE id = $1", [centerId]);
+  return res.json({ id: String(centerId), deleted: true });
+}
+
 export async function reviewCenter(req, res) {
   const centerId = Number(req.params.id);
   if (!Number.isInteger(centerId) || centerId <= 0) {
@@ -1258,6 +1651,14 @@ export async function rateCenter(req, res) {
     `,
     [centerId, Number(req.user.id), rating, satisfaction, feedbackMessage]
   );
+  await pool.query(
+    `
+      UPDATE health_centers
+      SET updated_at = NOW()
+      WHERE id = $1;
+    `,
+    [centerId]
+  );
 
   const stats = await pool.query(
     `
@@ -1318,7 +1719,7 @@ export async function createComplaintGeneric(req, res) {
 }
 
 export async function getCenterComplaints(req, res) {
-  if (!COMPLAINT_VIEW_ROLES.has(String(req.user?.role || "").toUpperCase())) {
+  if (!hasRequestRole(req, COMPLAINT_VIEW_ROLES)) {
     return res.status(403).json({ message: "Acces refuse" });
   }
   const centerId = Number(req.params.id);
@@ -1328,7 +1729,9 @@ export async function getCenterComplaints(req, res) {
   }
 
   const scope = await getRequesterScope(req);
-  const access = await canViewCenterByScope(scope, centerId);
+  const access = await canViewCenterByScope(scope, centerId, {
+    onlyApprovedForEstablishment: true
+  });
   if (!access.exists) {
     return res.status(404).json({ message: "Centre introuvable" });
   }
@@ -1374,9 +1777,11 @@ export async function getCenterComplaints(req, res) {
 }
 
 export async function getAllComplaints(req, res) {
-  if (!COMPLAINT_VIEW_ROLES.has(String(req.user?.role || "").toUpperCase())) {
+  if (!hasRequestRole(req, COMPLAINT_VIEW_ROLES)) {
     return res.status(403).json({ message: "Acces refuse" });
   }
+  const requesterRoles = getEffectiveRequestRoles(req);
+  const canViewJustifications = requesterRoles.some((role) => isAdminRole(role));
   const scope = await getRequesterScope(req);
   const status = typeof req.query?.status === "string" ? req.query.status.trim().toUpperCase() : "";
   const allowed = ["NEW", "IN_PROGRESS", "RESOLVED", "REJECTED"];
@@ -1386,7 +1791,9 @@ export async function getAllComplaints(req, res) {
     whereParts.push(`c.status = $${params.length + 1}`);
     params.push(status);
   }
-  applyCenterScope(whereParts, params, scope, "hc");
+  applyCenterScope(whereParts, params, scope, "hc", {
+    onlyApprovedForEstablishment: true
+  });
   const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
   const result = await pool.query(
@@ -1403,7 +1810,20 @@ export async function getAllComplaints(req, res) {
         c.created_at,
         u.full_name AS user_full_name,
         hc.name AS center_name,
-        hc.establishment_code AS center_code
+        hc.establishment_code AS center_code,
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'id', cu.id,
+              'status', cu.status,
+              'message', cu.message,
+              'createdAt', cu.created_at
+            )
+            ORDER BY cu.created_at ASC
+          )
+          FROM complaint_updates cu
+          WHERE cu.complaint_id = c.id
+        ), '[]'::json) AS updates
       FROM center_complaints c
       INNER JOIN users u ON u.id = c.user_id
       LEFT JOIN health_centers hc ON hc.id = c.center_id
@@ -1433,19 +1853,22 @@ export async function getAllComplaints(req, res) {
       status: row.status,
       handledBy: row.handled_by == null ? null : String(row.handled_by),
       handledAt: row.handled_at,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      ...(canViewJustifications ? { updates: row.updates || [] } : {})
     }))
   );
 }
 
 export async function getComplaintsSummary(req, res) {
-  if (!COMPLAINT_VIEW_ROLES.has(String(req.user?.role || "").toUpperCase())) {
+  if (!hasRequestRole(req, COMPLAINT_VIEW_ROLES)) {
     return res.status(403).json({ message: "Acces refuse" });
   }
   const scope = await getRequesterScope(req);
   const whereParts = [];
   const params = [];
-  applyCenterScope(whereParts, params, scope, "hc");
+  applyCenterScope(whereParts, params, scope, "hc", {
+    onlyApprovedForEstablishment: true
+  });
   const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
   const complaintsAgg = await pool.query(
@@ -1578,6 +2001,7 @@ export async function getComplaintsSummary(req, res) {
 
 export async function updateComplaintStatus(req, res) {
   const complaintId = Number(req.params.id);
+  const requesterRoles = getEffectiveRequestRoles(req);
   const requested = typeof req.body?.status === "string" ? req.body.status.trim().toUpperCase() : "";
   const nextStatus = ["IN_PROGRESS", "RESOLVED", "REJECTED"].includes(requested)
     ? requested
@@ -1585,6 +2009,35 @@ export async function updateComplaintStatus(req, res) {
 
   if (!Number.isInteger(complaintId) || complaintId <= 0) {
     return res.status(400).json({ message: "ID de plainte invalide" });
+  }
+
+  const found = await pool.query(
+    `
+      SELECT id, center_id
+      FROM center_complaints
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [complaintId]
+  );
+  if (found.rowCount === 0) {
+    return res.status(404).json({ message: "Plainte introuvable" });
+  }
+
+  const complaint = found.rows[0];
+  const complaintCenterId =
+    Number.isInteger(Number(complaint.center_id)) && Number(complaint.center_id) > 0
+      ? Number(complaint.center_id)
+      : null;
+  const scope = await getRequesterScope(req);
+
+  if (complaintCenterId) {
+    const access = await canViewCenterByScope(scope, complaintCenterId);
+    if (!access.allowed) {
+      return res.status(403).json({ message: "Acces refuse a cette plainte" });
+    }
+  } else if (!requesterRoles.some((role) => ["NATIONAL", "REGULATOR"].includes(role))) {
+    return res.status(403).json({ message: "Acces refuse a cette plainte" });
   }
 
   const updated = await pool.query(
@@ -1599,10 +2052,6 @@ export async function updateComplaintStatus(req, res) {
     `,
     [complaintId, nextStatus, Number(req.user.id)]
   );
-
-  if (updated.rowCount === 0) {
-    return res.status(404).json({ message: "Plainte introuvable" });
-  }
 
   const updateMessage =
     nextStatus === "IN_PROGRESS"
@@ -1632,6 +2081,65 @@ export async function updateComplaintStatus(req, res) {
     handledBy: row.handled_by == null ? null : String(row.handled_by),
     handledAt: row.handled_at,
     createdAt: row.created_at
+  });
+}
+
+export async function addComplaintExplanation(req, res) {
+  const complaintId = Number(req.params.id);
+  const requesterRoles = getEffectiveRequestRoles(req);
+  const explanation =
+    typeof req.body?.message === "string" ? req.body.message.trim() : "";
+
+  if (!Number.isInteger(complaintId) || complaintId <= 0) {
+    return res.status(400).json({ message: "ID de plainte invalide" });
+  }
+  if (!explanation) {
+    return res.status(400).json({ message: "Le message d'explication est obligatoire" });
+  }
+
+  const found = await pool.query(
+    `
+      SELECT id, center_id, status
+      FROM center_complaints
+      WHERE id = $1
+      LIMIT 1;
+    `,
+    [complaintId]
+  );
+  if (found.rowCount === 0) {
+    return res.status(404).json({ message: "Plainte introuvable" });
+  }
+
+  const complaint = found.rows[0];
+  const complaintCenterId =
+    Number.isInteger(Number(complaint.center_id)) && Number(complaint.center_id) > 0
+      ? Number(complaint.center_id)
+      : null;
+  const scope = await getRequesterScope(req);
+
+  if (complaintCenterId) {
+    const access = await canViewCenterByScope(scope, complaintCenterId, {
+      onlyApprovedForEstablishment: true
+    });
+    if (!access.allowed) {
+      return res.status(403).json({ message: "Acces refuse a cette plainte" });
+    }
+  } else if (!requesterRoles.some((role) => ["NATIONAL", "REGULATOR"].includes(role))) {
+    return res.status(403).json({ message: "Acces refuse a cette plainte" });
+  }
+
+  await pool.query(
+    `
+      INSERT INTO complaint_updates (complaint_id, user_id, status, message)
+      VALUES ($1, $2, $3, $4);
+    `,
+    [complaintId, Number(req.user.id), complaint.status, explanation]
+  );
+
+  return res.json({
+    complaintId: String(complaintId),
+    status: complaint.status,
+    message: explanation
   });
 }
 

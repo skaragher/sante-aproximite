@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const env = {
+  host: process.env.HOST || "0.0.0.0",
   port: process.env.PORT || 5000,
   databaseUrl: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/sante_aproxmite",
   jwtSecret: process.env.JWT_SECRET || "dev_secret",

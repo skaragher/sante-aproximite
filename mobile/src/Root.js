@@ -1,29 +1,41 @@
-import { ActivityIndicator, AppState, Image, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import { syncPendingRequests } from "./api/client";
+import { apiFetch, getPendingRequestsCount, syncPendingRequests } from "./api/client";
 import { useAuth } from "./context/AuthContext";
+import { C, S } from "./theme";
 import { AuthScreen } from "./screens/AuthScreen";
-import { ChefScreen } from "./screens/ChefScreen";
-import { ComplaintScreen } from "./screens/ComplaintScreen";
-import { EmergencyOpsScreen } from "./screens/EmergencyOpsScreen";
-import { EmergencyScreen } from "./screens/EmergencyScreen";
-import { NearbyScreen } from "./screens/NearbyScreen";
 
-const MENU_ICON_URIS = {
-  centers: "https://img.icons8.com/color/96/hospital-3.png",
-  complaints: "https://img.icons8.com/color/96/complaint.png",
-  tracking: "https://img.icons8.com/color/96/time-machine.png",
-  chef: "https://img.icons8.com/color/96/clinic.png",
-  alerts: "https://img.icons8.com/color/96/ambulance.png",
-  emergency: "https://img.icons8.com/color/96/ambulance.png",
-  logout: "https://img.icons8.com/color/96/exit.png"
+const MODULE_ICONS = {
+  centers:   { uri: "https://img.icons8.com/color/96/hospital-3.png" },
+  complaints:{ uri: "https://img.icons8.com/color/96/complaint.png" },
+  tracking:  { uri: "https://img.icons8.com/color/96/time-machine.png" },
+  chef:      { uri: "https://img.icons8.com/color/96/clinic.png" },
+  alerts:    { uri: "https://img.icons8.com/color/96/ambulance.png" },
+  emergency: { uri: "https://img.icons8.com/color/96/ambulance.png" },
+  security:  { uri: "https://img.icons8.com/color/96/police-badge.png" },
+  settings:  { uri: "https://img.icons8.com/color/96/settings.png" },
+};
+
+const MODULE_COLORS = {
+  nearby:              C.teal,
+  complaints:          C.primary,
+  complaints_tracking: C.primary,
+  chef:                C.teal,
+  alerts:              C.orange,
+  emergency:           C.red,
+  security_alert:      "#7C3AED",
+  security_ops:        C.primary,
+  settings:            C.textMuted,
 };
 
 export function Root() {
-  const { user, ready, logout } = useAuth();
+  const { user, token, ready, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState("nearby");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [chefCenterApprovalStatus, setChefCenterApprovalStatus] = useState(null);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const autoSelectedResponderTab = useRef(false);
+
   const normalizeRoleValue = (value) => String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
   const normalizedRole = normalizeRoleValue(user?.role);
   const normalizedRoles = Array.from(
@@ -36,38 +48,72 @@ export function Root() {
   );
   const hasRole = (roleName) => normalizedRoles.includes(roleName);
   const hasAnyRole = (roleNames) => roleNames.some((roleName) => hasRole(roleName));
-  const canManageCenters = hasRole("CHEF_ETABLISSEMENT");
-  const isEmergencyResponder = hasAnyRole(["SAMU", "SAPPEUR_POMPIER", "SAPEUR_POMPIER"]);
+  const canManageCenters = hasAnyRole(["CHEF_ETABLISSEMENT", "ETABLISSEMENT"]);
+  const canManageCenterSettings = hasAnyRole(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"]) || canManageCenters;
+  const chefHasPendingOrMissingCenter =
+    canManageCenters && (!chefCenterApprovalStatus || chefCenterApprovalStatus === "PENDING");
+  const isEmergencyResponder  = hasAnyRole(["SAMU", "SAPEUR_POMPIER", "SAPPEUR_POMPIER", "PROTECTION_CIVILE"]);
+  const isSecurityResponder   = hasAnyRole(["POLICE", "GENDARMERIE"]);
+  const isAnyResponder        = isEmergencyResponder || isSecurityResponder;
   const hasStandardMobileRole = hasAnyRole(["USER", "UTILISATEUR", "PATIENT"]);
-  const canSeeNearby = !canManageCenters;
-  const canComplain = !canManageCenters && (hasStandardMobileRole || !isEmergencyResponder);
-  const canSendEmergencyRequest = !canManageCenters && (hasStandardMobileRole || !isEmergencyResponder);
-  const emergencyAlertsLabel = hasRole("SAMU") && hasAnyRole(["SAPPEUR_POMPIER", "SAPEUR_POMPIER"])
-    ? "Alertes SAMU & Sapeur-pompier"
+  const canSeeNearby          = !canManageCenters || chefHasPendingOrMissingCenter;
+  const canComplain           = (!canManageCenters || chefHasPendingOrMissingCenter) && (hasStandardMobileRole || !isAnyResponder);
+  const canSendEmergencyRequest = (!canManageCenters || chefHasPendingOrMissingCenter) && (hasStandardMobileRole || !isAnyResponder);
+
+  const emergencyAlertsLabel = hasRole("SAMU") && hasAnyRole(["SAPEUR_POMPIER", "SAPPEUR_POMPIER"])
+    ? "Urgences sanitaires SAMU & Pompiers"
     : hasRole("SAMU")
-      ? "Alertes SAMU"
-      : "Alertes Sapeur-pompier";
+      ? "Urgences sanitaires SAMU"
+      : hasRole("PROTECTION_CIVILE")
+        ? "Urgences sanitaires Protection Civile"
+        : "Urgences sanitaires Pompiers";
 
   useEffect(() => {
-    const runSync = () => {
-      syncPendingRequests().catch(() => {});
+    const runSync = async () => {
+      try {
+        await syncPendingRequests();
+      } finally {
+        const nextCount = await getPendingRequestsCount().catch(() => 0);
+        setPendingSyncCount(nextCount);
+      }
     };
-
     runSync();
     const interval = setInterval(runSync, 30000);
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") runSync();
     });
-
-    return () => {
-      clearInterval(interval);
-      sub.remove();
-    };
+    return () => { clearInterval(interval); sub.remove(); };
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    async function loadChefCenterStatus() {
+      if (!user || !token || !canManageCenters) {
+        if (!cancelled) setChefCenterApprovalStatus(null);
+        return;
+      }
+      try {
+        const centers = await apiFetch("/centers", { token });
+        const first = Array.isArray(centers) ? centers[0] : null;
+        if (!cancelled) setChefCenterApprovalStatus(first?.approvalStatus || null);
+      } catch {
+        if (!cancelled) setChefCenterApprovalStatus(null);
+      }
+    }
+    loadChefCenterStatus();
+    const interval = setInterval(() => { loadChefCenterStatus().catch(() => {}); }, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [user, token, canManageCenters]);
+
+  useEffect(() => {
     if (canManageCenters) {
+      if (chefHasPendingOrMissingCenter) return;
       setCurrentTab("chef");
+      return;
+    }
+    if (isSecurityResponder && !autoSelectedResponderTab.current) {
+      setCurrentTab("security_ops");
+      autoSelectedResponderTab.current = true;
       return;
     }
     if (isEmergencyResponder && !autoSelectedResponderTab.current) {
@@ -75,217 +121,323 @@ export function Root() {
       autoSelectedResponderTab.current = true;
       return;
     }
-
     if (!canSeeNearby && currentTab === "nearby") {
       setCurrentTab("complaints");
       return;
     }
-
     if (!canComplain && ["complaints", "complaints_tracking"].includes(currentTab)) {
       setCurrentTab("nearby");
     }
-  }, [canManageCenters, isEmergencyResponder, canSeeNearby, canComplain, currentTab]);
+  }, [canManageCenters, chefHasPendingOrMissingCenter, isEmergencyResponder, canSeeNearby, canComplain, currentTab]);
 
   if (!ready) {
     return (
       <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color="#0b7285" />
+        <ActivityIndicator size="large" color={C.primary} />
       </SafeAreaView>
     );
   }
 
-  if (!user) {
-    return <AuthScreen />;
+  if (!user) return <AuthScreen />;
+
+  function renderCurrentScreen() {
+    if (canSeeNearby && currentTab === "nearby") {
+      const { NearbyScreen } = require("./screens/NearbyScreen");
+      return <NearbyScreen />;
+    }
+    if (canComplain && currentTab === "complaints") {
+      const { ComplaintScreen } = require("./screens/ComplaintScreen");
+      return <ComplaintScreen hideHistory />;
+    }
+    if (canComplain && currentTab === "complaints_tracking") {
+      const { ComplaintScreen } = require("./screens/ComplaintScreen");
+      return <ComplaintScreen hideForm />;
+    }
+    if (currentTab === "chef") {
+      const { ChefScreen } = require("./screens/ChefScreen");
+      return <ChefScreen />;
+    }
+    if (currentTab === "alerts") {
+      const { EmergencyOpsScreen } = require("./screens/EmergencyOpsScreen");
+      return <EmergencyOpsScreen />;
+    }
+    if (currentTab === "security_ops") {
+      const { SecurityAlertOpsScreen } = require("./screens/SecurityAlertOpsScreen");
+      return <SecurityAlertOpsScreen />;
+    }
+    if (currentTab === "emergency") {
+      const { EmergencyScreen } = require("./screens/EmergencyScreen");
+      return <EmergencyScreen />;
+    }
+    if (currentTab === "security_alert") {
+      const { SecurityAlertScreen } = require("./screens/SecurityAlertScreen");
+      return <SecurityAlertScreen />;
+    }
+    if (currentTab === "settings") {
+      const { CenterSettingsScreen } = require("./screens/CenterSettingsScreen");
+      return <CenterSettingsScreen />;
+    }
+    return null;
   }
 
   const tabs = [
-    ...(canSeeNearby ? [{ key: "nearby", label: "Geolocalisation des centres de sante", iconUri: MENU_ICON_URIS.centers }] : []),
-    ...(canComplain
-      ? [
-          { key: "complaints", label: "Poser une plaintes", iconUri: MENU_ICON_URIS.complaints },
-          { key: "complaints_tracking", label: "Suivi des plaintes", iconUri: MENU_ICON_URIS.tracking }
-        ]
-      : []),
-    ...(canManageCenters ? [{ key: "chef", label: "Espace chef", iconUri: MENU_ICON_URIS.chef }] : []),
-    ...(isEmergencyResponder ? [{ key: "alerts", label: emergencyAlertsLabel, iconUri: MENU_ICON_URIS.alerts }] : []),
-    ...(canSendEmergencyRequest ? [{ key: "emergency", label: "Urgence sanitaire", iconUri: MENU_ICON_URIS.emergency }] : [])
+    ...(canSeeNearby           ? [{ key: "nearby",              label: "Centres de sante",       icon: MODULE_ICONS.centers   }] : []),
+    ...(canComplain             ? [{ key: "complaints",          label: "Poser une plainte",      icon: MODULE_ICONS.complaints }] : []),
+    ...(canComplain             ? [{ key: "complaints_tracking", label: "Suivi des plaintes",     icon: MODULE_ICONS.tracking   }] : []),
+    ...(canManageCenters        ? [{ key: "chef",                label: "Espace chef",            icon: MODULE_ICONS.chef       }] : []),
+    ...(isEmergencyResponder    ? [{ key: "alerts",              label: emergencyAlertsLabel,     icon: MODULE_ICONS.alerts     }] : []),
+    ...(isSecurityResponder     ? [{ key: "security_ops",        label: "Urgences securitaires",   icon: MODULE_ICONS.security   }] : []),
+    ...(canSendEmergencyRequest ? [{ key: "emergency",           label: "Urgence sanitaire",      icon: MODULE_ICONS.emergency  }] : []),
+    ...(canSendEmergencyRequest ? [{ key: "security_alert",      label: "Urgence securitaire",    icon: MODULE_ICONS.security   }] : []),
+    ...(canManageCenterSettings ? [{ key: "settings",            label: "Parametres centres",     icon: MODULE_ICONS.settings   }] : []),
   ];
+
+  const activeTab = tabs.find((t) => t.key === currentTab);
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Top bar */}
       <View style={styles.topBar}>
-        <View style={styles.brandWrap}>
+        <View style={styles.brandRow}>
           <View style={styles.logoWrap}>
             <Image source={require("../assets/logo-sante.png")} style={styles.logo} />
           </View>
-          <View style={styles.brandTextWrap}>
-            <Text style={styles.title} numberOfLines={1}>Sante Aproximite</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>{user.fullName}</Text>
+          <View style={styles.brandText}>
+            <Text style={styles.appName} numberOfLines={1}>Sante Aproximite</Text>
+            <Text style={styles.userName} numberOfLines={1}>{user.fullName}</Text>
           </View>
         </View>
-        <Pressable style={styles.menuButton} onPress={() => setMenuOpen((prev) => !prev)} aria-label="Menu">
-          <View style={styles.menuBars}>
-            <View style={styles.menuBarLine} />
-            <View style={styles.menuBarLine} />
-            <View style={styles.menuBarLine} />
-          </View>
-        </Pressable>
+        <View style={styles.topBarRight}>
+          {activeTab ? (
+            <View style={[styles.moduleLabel, { backgroundColor: MODULE_COLORS[currentTab] || C.primary }]}>
+              <Text style={styles.moduleLabelText} numberOfLines={1}>{activeTab.label}</Text>
+            </View>
+          ) : null}
+          <Pressable style={styles.menuBtn} onPress={() => setMenuOpen(true)} accessibilityLabel="Menu">
+            <View style={styles.hamburger}>
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+              <View style={styles.hamburgerLine} />
+            </View>
+          </Pressable>
+        </View>
       </View>
 
-      {menuOpen ? (
-        <View style={styles.dropdownMenu}>
-          <View style={styles.menuGrid}>
-            {tabs.map((tab) => (
-              <Pressable
-                key={tab.key}
-                style={[styles.menuModule, currentTab === tab.key && styles.menuModuleActive]}
-                onPress={() => {
-                  setCurrentTab(tab.key);
-                  setMenuOpen(false);
-                }}
-              >
-                <Image source={{ uri: tab.iconUri }} style={styles.menuModuleIconImage} />
-                <Text style={[styles.menuModuleText, currentTab === tab.key && styles.menuModuleTextActive]}>
-                  {tab.label}
-                </Text>
+      {/* Full-screen menu overlay */}
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.overlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.drawer} onPress={() => {}}>
+            <View style={styles.drawerHeader}>
+              <View style={styles.drawerUserRow}>
+                <View style={styles.drawerAvatar}>
+                  <Text style={styles.drawerAvatarText}>{String(user.fullName || "?")[0].toUpperCase()}</Text>
+                </View>
+                <View style={styles.drawerUserInfo}>
+                  <Text style={styles.drawerUserName}>{user.fullName}</Text>
+                  <Text style={styles.drawerUserRole}>{normalizedRole || "Utilisateur"}</Text>
+                </View>
+              </View>
+              <Pressable style={styles.drawerCloseBtn} onPress={() => setMenuOpen(false)}>
+                <Text style={styles.drawerCloseBtnText}>✕</Text>
               </Pressable>
-            ))}
-            <Pressable
-              style={styles.menuModule}
-              onPress={() => {
-                setMenuOpen(false);
-                logout();
-              }}
-            >
-              <Image source={{ uri: MENU_ICON_URIS.logout }} style={styles.menuModuleIconImage} />
-              <Text style={styles.menuModuleText}>Deconnexion</Text>
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
+            </View>
 
-      <View style={styles.contentWrap}>
-        {canSeeNearby && currentTab === "nearby" ? <NearbyScreen /> : null}
-        {canComplain && currentTab === "complaints" ? <ComplaintScreen hideHistory /> : null}
-        {canComplain && currentTab === "complaints_tracking" ? <ComplaintScreen hideForm /> : null}
-        {currentTab === "chef" ? <ChefScreen /> : null}
-        {currentTab === "alerts" ? <EmergencyOpsScreen /> : null}
-        {currentTab === "emergency" ? <EmergencyScreen /> : null}
+            <View style={styles.drawerDivider} />
+
+            <View style={styles.moduleGrid}>
+              {tabs.map((tab) => {
+                const accent = MODULE_COLORS[tab.key] || C.primary;
+                const isActive = currentTab === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    style={[styles.moduleCard, isActive && { borderColor: accent, borderWidth: 2 }]}
+                    onPress={() => { setCurrentTab(tab.key); setMenuOpen(false); }}
+                  >
+                    {isActive ? <View style={[styles.moduleCardActiveBar, { backgroundColor: accent }]} /> : null}
+                    <Image source={tab.icon} style={styles.moduleCardIcon} />
+                    <Text style={[styles.moduleCardText, isActive && { color: accent }]}>{tab.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.drawerDivider} />
+
+            <Pressable
+              style={styles.logoutBtn}
+              onPress={() => { setMenuOpen(false); logout(); }}
+            >
+              <Text style={styles.logoutBtnText}>Se deconnecter</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Content */}
+      <View style={styles.content}>
+        {pendingSyncCount > 0 ? (
+          <View style={styles.offlineBanner}>
+            <Text style={styles.offlineBannerText}>
+              {pendingSyncCount} action(s) en attente de synchronisation.
+            </Text>
+          </View>
+        ) : null}
+        {renderCurrentScreen()}
       </View>
+
       <View style={styles.footer}>
-        <View style={styles.poweredBadge}>
-          <Text style={styles.footerText}>Powered by YEFA TECHNOLOGIE</Text>
-        </View>
+        <Text style={styles.footerText}>Powered by YEFA TECHNOLOGIE</Text>
+       <Text
+    style={[styles.footerText, { color: '#2563eb' }]}
+    onPress={() => Linking.openURL('mailto:yefa.technologie@gmail.com')}
+  >
+    yefa.technologie@gmail.com
+  </Text>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5fbff", paddingTop: 8 },
-  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+  container: { flex: 1, backgroundColor: C.bg },
+  centered:  { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
+
+  // Top bar
   topBar: {
-    marginTop: 14,
+    marginTop: 10,
     marginHorizontal: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: "#0057b8",
-    borderColor: "#00408a",
-    borderWidth: 1,
-    borderRadius: 14,
+    backgroundColor: C.primary,
+    borderRadius: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2
+    ...S.md,
   },
-  brandWrap: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 },
-  logoWrap: {
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: "#b8d5ff",
-    padding: 2,
-    backgroundColor: "#00408a"
+  brandRow:    { flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 },
+  logoWrap:    { borderRadius: 12, overflow: "hidden", borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
+  logo:        { width: 36, height: 36 },
+  brandText:   { flex: 1, minWidth: 0 },
+  appName:     { fontSize: 16, fontWeight: "800", color: "#FFFFFF" },
+  userName:    { fontSize: 12, color: "rgba(255,255,255,0.8)", fontWeight: "500", marginTop: 1 },
+  topBarRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  moduleLabel: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    maxWidth: 120,
   },
-  logo: { width: 34, height: 34, borderRadius: 10 },
-  title: { fontSize: 18, fontWeight: "800", color: "#ffffff" },
-  subtitle: { color: "#dbeafe", marginTop: 1, fontWeight: "600", fontSize: 12 },
-  brandTextWrap: { flex: 1, minWidth: 0 },
-  menuButton: {
-    width: 36,
-    height: 36,
-    borderColor: "transparent",
-    borderWidth: 0,
-    borderRadius: 10,
-    backgroundColor: "transparent"
+  moduleLabelText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  menuBtn:     { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  hamburger:   { gap: 5, alignItems: "center" },
+  hamburgerLine: { width: 18, height: 2, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.9)" },
+
+  // Modal overlay
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.55)",
+    justifyContent: "flex-end",
   },
-  menuBars: { flex: 1, alignItems: "center", justifyContent: "center", gap: 4 },
-  menuBarLine: { width: 16, height: 2, borderRadius: 999, backgroundColor: "#dbeafe" },
-  dropdownMenu: {
-    position: "absolute",
-    top: 74,
-    right: 12,
-    width: 292,
-    zIndex: 20,
-    backgroundColor: "#edf4ff",
-    borderColor: "#a7c7f7",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-    gap: 6
+  drawer: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
+    maxHeight: "85%",
   },
-  menuGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8
-  },
-  menuModule: {
-    width: 130,
-    minHeight: 86,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    backgroundColor: "#ffffff",
+  drawerHeader:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  drawerUserRow:   { flexDirection: "row", alignItems: "center", gap: 12 },
+  drawerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: C.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  drawerAvatarText: { color: "#fff", fontWeight: "800", fontSize: 20 },
+  drawerUserInfo:   { gap: 2 },
+  drawerUserName:   { fontWeight: "700", fontSize: 16, color: C.textDark },
+  drawerUserRole:   { fontSize: 12, color: C.textMuted, fontWeight: "600" },
+  drawerCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: C.bg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  drawerCloseBtnText: { color: C.textMuted, fontWeight: "700", fontSize: 14 },
+  drawerDivider:  { height: 1, backgroundColor: C.border, marginVertical: 14 },
+
+  moduleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  moduleCard: {
+    width: "47%",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    alignItems: "center",
+    paddingVertical: 14,
     paddingHorizontal: 8,
-    paddingVertical: 10
+    gap: 8,
+    overflow: "hidden",
+    ...S.sm,
   },
-  menuModuleActive: {
-    backgroundColor: "#2563eb",
-    borderColor: "#1e40af"
+  moduleCardActiveBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
   },
-  menuModuleIconImage: {
-    width: 26,
-    height: 26,
-    marginBottom: 6
-  },
-  menuModuleText: {
-    color: "#1e3a8a",
+  moduleCardIcon: { width: 32, height: 32 },
+  moduleCardText: {
+    color: C.textMed,
     fontWeight: "700",
     fontSize: 12,
-    textAlign: "center"
+    textAlign: "center",
   },
-  menuModuleTextActive: { color: "#ffffff" },
-  contentWrap: { flex: 1, paddingBottom: 8 },
-  footer: {
-    borderTopWidth: 1,
-    borderTopColor: "#dbe7ef",
-    backgroundColor: "#ffffff",
-    paddingVertical: 10,
-    alignItems: "center"
-  },
-  poweredBadge: {
-    backgroundColor: "#e6f4f7",
-    borderColor: "#9fd3de",
+
+  logoutBtn: {
+    backgroundColor: C.redLight,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5
+    borderColor: C.red + "50",
   },
-  footerText: { color: "#0b7285", fontWeight: "800", fontSize: 12, letterSpacing: 0.2 }
+  logoutBtnText: { color: C.red, fontWeight: "700", fontSize: 15 },
+
+  content: { flex: 1, marginTop: 10 },
+  offlineBanner: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: C.amberLight,
+    borderWidth: 1,
+    borderColor: C.amber,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  offlineBannerText: {
+    color: C.amber,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  footer: {
+    paddingVertical: 10,
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    backgroundColor: C.surface,
+  },
+  footerText: { color: C.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
 });

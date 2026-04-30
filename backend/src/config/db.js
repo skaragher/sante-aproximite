@@ -20,7 +20,7 @@ async function runMigrations() {
           'REGION',
           'DISTRICT',
           'ETABLISSEMENT',
-          'SAPPEUR_POMPIER',
+          'SAPEUR_POMPIER',
           'SAMU',
           'CHEF_ETABLISSEMENT'
         )
@@ -47,9 +47,13 @@ async function runMigrations() {
           'REGION',
           'DISTRICT',
           'ETABLISSEMENT',
-          'SAPPEUR_POMPIER',
+          'SAPEUR_POMPIER',
+          'SAPEUR_POMPIER',
           'SAMU',
-          'CHEF_ETABLISSEMENT'
+          'CHEF_ETABLISSEMENT',
+          'POLICE',
+          'GENDARMERIE',
+          'PROTECTION_CIVILE'
         )
       ),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -205,9 +209,13 @@ async function runMigrations() {
         'REGION',
         'DISTRICT',
         'ETABLISSEMENT',
-        'SAPPEUR_POMPIER',
+        'SAPEUR_POMPIER',
+        'SAPEUR_POMPIER',
         'SAMU',
-        'CHEF_ETABLISSEMENT'
+        'CHEF_ETABLISSEMENT',
+        'POLICE',
+        'GENDARMERIE',
+        'PROTECTION_CIVILE'
       )
     );
   `);
@@ -275,7 +283,7 @@ async function runMigrations() {
     CREATE TABLE IF NOT EXISTS emergency_reports (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      target_service TEXT NOT NULL CHECK (target_service IN ('SAMU', 'SAPPEUR_POMPIER')),
+      target_service TEXT NOT NULL CHECK (target_service IN ('SAMU', 'SAPEUR_POMPIER', 'SAPEUR_POMPIER', 'POLICE', 'GENDARMERIE', 'PROTECTION_CIVILE')),
       emergency_type TEXT NOT NULL,
       pickup_point_name TEXT NULL,
       description TEXT NOT NULL,
@@ -345,7 +353,7 @@ async function runMigrations() {
     CREATE TABLE IF NOT EXISTS emergency_bases (
       id BIGSERIAL PRIMARY KEY,
       name TEXT NOT NULL,
-      service_type TEXT NOT NULL CHECK (service_type IN ('SAMU', 'SAPPEUR_POMPIER')),
+      service_type TEXT NOT NULL CHECK (service_type IN ('SAMU', 'SAPEUR_POMPIER', 'SAPEUR_POMPIER', 'POLICE', 'GENDARMERIE', 'PROTECTION_CIVILE')),
       address TEXT NOT NULL,
       latitude DOUBLE PRECISION NOT NULL,
       longitude DOUBLE PRECISION NOT NULL,
@@ -715,6 +723,110 @@ async function runMigrations() {
   await pool.query(
     "CREATE INDEX IF NOT EXISTS idx_districts_region_code ON districts(region_code);"
   );
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS security_alerts (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      alert_type TEXT NOT NULL CHECK (
+        alert_type IN ('AGRESSION', 'ACCIDENT', 'INCENDIE', 'INTRUSION', 'AUTRE')
+      ),
+      location_name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      phone_number TEXT NOT NULL,
+      photos JSONB NOT NULL DEFAULT '[]'::jsonb,
+      latitude DOUBLE PRECISION NOT NULL,
+      longitude DOUBLE PRECISION NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('NEW', 'ACKNOWLEDGED', 'RESOLVED', 'CLOSED')) DEFAULT 'NEW',
+      handled_by BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+      handled_at TIMESTAMPTZ NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // Ajouter target_service sur security_alerts si absent
+  await pool.query(`
+    ALTER TABLE security_alerts
+    ADD COLUMN IF NOT EXISTS target_service TEXT NOT NULL DEFAULT 'POLICE';
+  `);
+  await pool.query(`
+    ALTER TABLE security_alerts
+    ADD COLUMN IF NOT EXISTS photos JSONB NOT NULL DEFAULT '[]'::jsonb;
+  `);
+  await pool.query(`
+    ALTER TABLE security_alerts
+    DROP CONSTRAINT IF EXISTS security_alerts_target_service_check;
+  `);
+  await pool.query(`
+    ALTER TABLE security_alerts
+    ADD CONSTRAINT security_alerts_target_service_check
+    CHECK (target_service IN ('POLICE', 'GENDARMERIE', 'PROTECTION_CIVILE'));
+  `);
+
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_security_alerts_target_service ON security_alerts(target_service);"
+  );
+
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_security_alerts_user_id ON security_alerts(user_id);"
+  );
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_security_alerts_status ON security_alerts(status);"
+  );
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_security_alerts_created_at ON security_alerts(created_at);"
+  );
+
+  // Normaliser les anciennes donnees SAPPEUR_POMPIER (double P) -> SAPEUR_POMPIER
+  await pool.query(`UPDATE user_roles SET role = 'SAPEUR_POMPIER' WHERE role = 'SAPPEUR_POMPIER';`);
+  await pool.query(`UPDATE users SET role = 'SAPEUR_POMPIER' WHERE role = 'SAPPEUR_POMPIER';`);
+  await pool.query(`UPDATE emergency_reports SET target_service = 'SAPEUR_POMPIER' WHERE target_service = 'SAPPEUR_POMPIER';`);
+  await pool.query(`UPDATE emergency_bases SET service_type = 'SAPEUR_POMPIER' WHERE service_type = 'SAPPEUR_POMPIER';`);
+
+  // Elargir les contraintes CHECK pour les nouveaux roles et services
+  await pool.query(`ALTER TABLE user_roles DROP CONSTRAINT IF EXISTS user_roles_role_check;`);
+  await pool.query(`
+    ALTER TABLE user_roles
+    ADD CONSTRAINT user_roles_role_check CHECK (
+      role IN (
+        'USER','REGULATOR','NATIONAL','REGION','DISTRICT',
+        'ETABLISSEMENT','SAPEUR_POMPIER','SAMU',
+        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE'
+      )
+    );
+  `);
+
+  await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;`);
+  await pool.query(`
+    ALTER TABLE users
+    ADD CONSTRAINT users_role_check CHECK (
+      role IN (
+        'USER','REGULATOR','NATIONAL','REGION','DISTRICT',
+        'ETABLISSEMENT','SAPEUR_POMPIER','SAMU',
+        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE'
+      )
+    );
+  `);
+
+  await pool.query(`ALTER TABLE emergency_reports DROP CONSTRAINT IF EXISTS emergency_reports_target_service_check;`);
+  await pool.query(`
+    ALTER TABLE emergency_reports
+    ADD CONSTRAINT emergency_reports_target_service_check CHECK (
+      target_service IN (
+        'SAMU','SAPEUR_POMPIER','POLICE','GENDARMERIE','PROTECTION_CIVILE'
+      )
+    );
+  `);
+
+  await pool.query(`ALTER TABLE emergency_bases DROP CONSTRAINT IF EXISTS emergency_bases_service_type_check;`);
+  await pool.query(`
+    ALTER TABLE emergency_bases
+    ADD CONSTRAINT emergency_bases_service_type_check CHECK (
+      service_type IN (
+        'SAMU','SAPEUR_POMPIER','POLICE','GENDARMERIE','PROTECTION_CIVILE'
+      )
+    );
+  `);
 }
 
 export async function connectDb() {
@@ -722,5 +834,4 @@ export async function connectDb() {
   await runMigrations();
   console.log("PostgreSQL connected");
 }
-
 

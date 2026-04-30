@@ -1,17 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
-const FALLBACK_API_URL = "http://45.147.250.126:5000/api";
-
-const API_URL = (
-  Constants?.expoConfig?.extra?.apiUrl ||
-  Constants?.manifest?.extra?.apiUrl ||
-  Constants?.manifest2?.extra?.expoClient?.extra?.apiUrl ||
-  process.env.EXPO_PUBLIC_API_URL ||
-  process.env.EXPO_PUBLIC_API_URL_PROD ||
-  process.env.EXPO_PUBLIC_API_URL_DEV ||
+const FALLBACK_API_URL = "http://193.168.173.181:8081/api";
+const API_URL_CANDIDATES = [
+  Constants?.expoConfig?.extra?.apiUrl,
+  Constants?.manifest?.extra?.apiUrl,
+  Constants?.manifest2?.extra?.expoClient?.extra?.apiUrl,
+  process.env.EXPO_PUBLIC_API_URL,
+  process.env.EXPO_PUBLIC_API_URL_DEV,
+  process.env.EXPO_PUBLIC_API_URL_PROD,
   FALLBACK_API_URL
-).replace(/\/+$/, "");
+]
+  .map((value) => String(value || "").trim().replace(/\/+$/, ""))
+  .filter(Boolean)
+  .filter((value, index, array) => array.indexOf(value) === index);
 const OFFLINE_QUEUE_KEY = "sante_aproxmite_offline_queue";
 const TOKEN_KEY = "sante_aproxmite_token";
 const REFRESH_TOKEN_KEY = "sante_aproxmite_refresh_token";
@@ -52,51 +54,60 @@ function toCacheKey(path, token) {
 }
 
 async function requestApi(path, { token, method = "GET", body, timeoutMs = 15000 } = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let lastError = null;
 
-  try {
-    const response = await fetch(`${API_URL}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: controller.signal
-    });
+  for (const baseUrl of API_URL_CANDIDATES) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const rawText = await response.text();
-    let data = {};
     try {
-      data = rawText ? JSON.parse(rawText) : {};
-    } catch {
-      data = {};
-    }
+      const response = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: controller.signal
+      });
 
-    if (!response.ok) {
-      let message = data.message || "";
-      if (!message && response.status === 404) {
-        message = `Service indisponible: endpoint introuvable (${path}). Verifiez que le backend est a jour.`;
+      const rawText = await response.text();
+      let data = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {};
       }
-      if (!message && response.status >= 500) {
-        message = "Erreur serveur. Reessayez dans quelques instants.";
-      }
-      if (!message && response.status === 401) {
-        message = "Session invalide ou expiree. Reconnectez-vous.";
-      }
-      if (!message && response.status === 403) {
-        message = "Acces refuse pour cette action.";
-      }
-      const err = new Error(message || "Erreur API");
-      err.status = response.status;
-      throw err;
-    }
 
-    return data;
-  } finally {
-    clearTimeout(timeout);
+      if (!response.ok) {
+        let message = data.message || "";
+        if (!message && response.status === 404) {
+          message = `Service indisponible: endpoint introuvable (${path}). Verifiez que le backend est a jour.`;
+        }
+        if (!message && response.status >= 500) {
+          message = "Erreur serveur. Reessayez dans quelques instants.";
+        }
+        if (!message && response.status === 401) {
+          message = "Session invalide ou expiree. Reconnectez-vous.";
+        }
+        if (!message && response.status === 403) {
+          message = "Acces refuse pour cette action.";
+        }
+        const err = new Error(message || "Erreur API");
+        err.status = response.status;
+        throw err;
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+      if (!isNetworkFailure(error)) throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+
+  throw lastError || new Error("Impossible de contacter le serveur");
 }
 
 let refreshingPromise = null;
@@ -161,6 +172,16 @@ async function enqueueOfflineRequest(path, { token, method, body }) {
     createdAt: new Date().toISOString()
   });
   await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+export async function getPendingRequests() {
+  const raw = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function getPendingRequestsCount() {
+  const queue = await getPendingRequests();
+  return queue.length;
 }
 
 export async function syncPendingRequests() {

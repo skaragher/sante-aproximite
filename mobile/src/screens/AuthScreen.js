@@ -19,6 +19,7 @@ export function AuthScreen() {
   const { login } = useAuth();
   const [profileType, setProfileType] = useState("USER");
   const [hasAccount, setHasAccount] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -76,8 +77,17 @@ export function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 12}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.hero}>
             <View style={styles.heroBlobPrimary} />
             <View style={styles.heroBlobSecondary} />
@@ -124,7 +134,7 @@ export function AuthScreen() {
                 }}
               >
                 <Text style={[styles.roleText, profileType === "EMERGENCY" && styles.roleTextActive]}>
-                  SAMU / Pompiers
+                  Secours / Sécurités
                 </Text>
               </Pressable>
             </View>
@@ -134,10 +144,10 @@ export function AuthScreen() {
                   ? "Utilisateur: connexion par numero"
                   : "Utilisateur: creation de compte"
                 : profileType === "EMERGENCY"
-                  ? "SAMU/Pompiers: connexion securisee"
+                  ? "comptes professionnels: connexion securisee"
                 : hasAccount
-                  ? "Chef: connexion"
-                  : "Chef: inscription"}
+                  ? "Chef d'établissement: connexion"
+                  : "Chef d'établissement: inscription"}
             </Text>
             {profileType !== "EMERGENCY" ? (
               <>
@@ -192,16 +202,28 @@ export function AuthScreen() {
                   placeholder="Email"
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  textContentType="username"
                   value={form.email}
                   onChangeText={(value) => setForm({ ...form, email: value })}
                 />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Mot de passe"
-                  secureTextEntry
-                  value={form.password}
-                  onChangeText={(value) => setForm({ ...form, password: value })}
-                />
+                <View style={styles.passwordField}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Mot de passe"
+                    secureTextEntry={!showPassword}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    returnKeyType={hasAccount ? "go" : "next"}
+                    textContentType="password"
+                    value={form.password}
+                    onChangeText={(value) => setForm({ ...form, password: value })}
+                  />
+                  <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
+                    <Text style={styles.passwordToggleText}>{showPassword ? "Masquer" : "Afficher"}</Text>
+                  </Pressable>
+                </View>
                 {!hasAccount ? (
                   <TextInput
                     style={styles.input}
@@ -220,16 +242,28 @@ export function AuthScreen() {
                   placeholder="Email professionnel"
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  textContentType="username"
                   value={form.email}
                   onChangeText={(value) => setForm({ ...form, email: value })}
                 />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Mot de passe"
-                  secureTextEntry
-                  value={form.password}
-                  onChangeText={(value) => setForm({ ...form, password: value })}
-                />
+                <View style={styles.passwordField}>
+                  <TextInput
+                    style={styles.passwordInput}
+                    placeholder="Mot de passe"
+                    secureTextEntry={!showPassword}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    returnKeyType="go"
+                    textContentType="password"
+                    value={form.password}
+                    onChangeText={(value) => setForm({ ...form, password: value })}
+                  />
+                  <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
+                    <Text style={styles.passwordToggleText}>{showPassword ? "Masquer" : "Afficher"}</Text>
+                  </Pressable>
+                </View>
               </>
             ) : null}
 
@@ -251,7 +285,7 @@ export function AuthScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { flex: 1, backgroundColor: "#fff7ed" },
-  content: { padding: 20, paddingTop: 24, gap: 14, justifyContent: "center", flexGrow: 1 },
+  content: { padding: 20, paddingTop: 24, paddingBottom: 40, gap: 14, justifyContent: "center", flexGrow: 1 },
   hero: {
     position: "relative",
     overflow: "hidden",
@@ -323,6 +357,32 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12
+  },
+  passwordField: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "#d0e3ec",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingLeft: 12,
+    paddingRight: 8
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 12
+  },
+  passwordToggle: {
+    minWidth: 74,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 8
+  },
+  passwordToggleText: {
+    color: "#c2410c",
+    fontWeight: "700",
+    fontSize: 12
   },
   roleRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   roleButton: {

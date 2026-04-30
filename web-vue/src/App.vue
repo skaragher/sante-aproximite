@@ -100,7 +100,7 @@ import { useAuthStore } from "./stores/auth";
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
-const backendUrl = (import.meta.env.VITE_API_URL || "http://127.0.0.1:5000/api").replace(/\/+$/, "");
+const backendUrl = (import.meta.env.VITE_API_URL || "http://193.168.173.181:8081/api").replace(/\/+$/, "");
 const isAuthPage = computed(() => route.path === "/login" || route.path === "/register");
 const normalizeRole = (value) => String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 const role = computed(() => normalizeRole(auth.state.user?.role || ""));
@@ -119,7 +119,7 @@ const currentTab = computed(() => String(route.query.tab || "").trim());
 const sidebarOpen = ref(false);
 const adminRoles = new Set(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"]);
 const etablissementRoles = new Set(["ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
-const emergencyRoleValues = ["SAMU", "SAPPEUR_POMPIER", "SAPEUR_POMPIER"];
+const emergencyRoleValues = ["SAMU", "SAPEUR_POMPIER", "SAPEUR_POMPIER"];
 
 const menuItems = computed(() => {
   if (!auth.state.token) return [];
@@ -147,6 +147,7 @@ const menuItems = computed(() => {
     pushItem({ tab: "complaints", label: "Gestion des Plaintes", icon: "📝", section: "QUALITE", decor: "📈" });
     pushItem({ tab: "evaluations", label: "Evaluations", icon: "📊", section: "QUALITE", decor: "📈" });
     pushItem({ tab: "settings", label: "Parametres", icon: "⚙", section: "GOUVERNANCE", decor: "👥" });
+    pushItem({ tab: "imports", label: "Importations", icon: "📥", section: "GOUVERNANCE", decor: "👥" });
   }
 
   return items;
@@ -158,7 +159,7 @@ const roleChipLabel = computed(() => {
   if (hasRole("DISTRICT")) return "Niveau District";
   if (hasRole("REGULATOR")) return "Autorite de regulation";
   if (hasAnyRole([...etablissementRoles])) return "Niveau Etablissement";
-  if (hasAnyRole(["SAPPEUR_POMPIER", "SAPEUR_POMPIER"])) return "SAPEUR-POMPIER";
+  if (hasAnyRole(["SAPEUR_POMPIER", "SAPEUR_POMPIER"])) return "SAPEUR-POMPIER";
   if (hasRole("SAMU")) return "Service SAMU";
   return "Gestionnaire Plateforme";
 });
