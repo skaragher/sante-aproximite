@@ -809,6 +809,44 @@ const _store = (() => {
     return csv.split(",").map((s) => s.trim()).filter(Boolean).map((name) => ({ name }));
   }
 
+  function parseCsvLine(line, delimiter) {
+    const cells = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      const next = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && next === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (char === delimiter && !inQuotes) {
+        cells.push(current.trim());
+        current = "";
+        continue;
+      }
+
+      current += char;
+    }
+
+    cells.push(current.trim());
+    return cells;
+  }
+
+  function detectCsvDelimiter(headerLine) {
+    const commaCount = (headerLine.match(/,/g) || []).length;
+    const semicolonCount = (headerLine.match(/;/g) || []).length;
+    return semicolonCount > commaCount ? ";" : ",";
+  }
+
   function parseNumeric(value) {
     if (typeof value === "number") return Number.isFinite(value) ? value : null;
     if (typeof value !== "string") return null;
@@ -835,8 +873,16 @@ const _store = (() => {
     if (!s) return "CENTRE_SANTE";
     if (s === "CHU") return "CHU";
     if (s === "CHR") return "CHR";
+    if (s === "CH") return "CH";
     if (s === "CHS") return "CHS";
     if (s === "HG") return "CH";
+    if (s === "ESPC" || s.includes("PREMIER CONTACT")) return "ESPC";
+    if (s === "CENTRE_SANTE" || s === "CENTRE DE SANTE" || s === "CENTRES DE SANTE") return "CENTRE_SANTE";
+    if (s === "CLCC" || s.includes("LUTTE CONTRE LE CANCER")) return "CLCC";
+    if (s === "SSR" || s.includes("READAPTATION")) return "SSR";
+    if (s.includes("EHPAD") || s.includes("USLD")) return "EHPAD_USLD";
+    if (s.includes("RADIOTHERAPIE")) return "CENTRE_RADIOTHERAPIE";
+    if (s.includes("CARDIOLOGIE")) return "CENTRE_CARDIOLOGIE";
     if (
       ["CLINIQUE", "POLYCLINIQUE", "CABINET DENTAIRE", "CABINET OPTIQUE",
        "CABINET MEDICAL", "LABORATOIRE", "INSTITUT SPECIALISE"].includes(s)
@@ -895,12 +941,13 @@ const _store = (() => {
   async function readFileRows(file) {
     const ext = String(file?.name || "").toLowerCase();
     if (ext.endsWith(".csv")) {
-      const text = await file.text();
+      const text = (await file.text()).replace(/^\uFEFF/, "");
       const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       if (!lines.length) return [];
-      const headers = lines[0].split(",").map((h) => h.trim());
+      const delimiter = detectCsvDelimiter(lines[0]);
+      const headers = parseCsvLine(lines[0], delimiter);
       return lines.slice(1).map((line) => {
-        const values = line.split(",").map((v) => v.trim());
+        const values = parseCsvLine(line, delimiter);
         const row = {};
         headers.forEach((h, i) => { row[h] = values[i] ?? ""; });
         return row;
@@ -1710,6 +1757,98 @@ const _store = (() => {
     }
   }
 
+  function escapeCsvCell(value) {
+    const text = String(value ?? "");
+    if (/[",;\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+    return text;
+  }
+
+  async function downloadBackendCsv(path, filename) {
+    const baseUrl = (import.meta.env.VITE_API_URL || "http://193.168.173.181:8081/api").replace(/\/+$/, "");
+    let response;
+    try {
+      response = await fetch(`${baseUrl}${path}`, {
+        headers: {
+          Authorization: `Bearer ${auth.state.token}`,
+        },
+      });
+    } catch {
+      throw new Error("Impossible de joindre l'API pour l'export.");
+    }
+
+    if (!response.ok) {
+      let message = `Export impossible (${response.status})`;
+      try {
+        const data = await response.json();
+        if (data?.message) message = data.message;
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function isEspcCenter(center) {
+    const level = String(center?.level || "").trim().toUpperCase();
+    const name = String(center?.name || "").trim().toUpperCase();
+    const technicalPlatform = String(center?.technicalPlatform || "").trim().toUpperCase();
+    const establishmentCode = String(center?.establishmentCode || "").trim().toUpperCase();
+
+    return (
+      level === "ESPC" ||
+      level === "CENTRE_SANTE" ||
+      level === "CLINIQUE_PRIVEE" ||
+      name.includes("ESPC") ||
+      name.includes("PREMIER CONTACT") ||
+      technicalPlatform.includes("ESPC") ||
+      technicalPlatform.includes("PREMIER CONTACT") ||
+      establishmentCode.includes("ESPC")
+    );
+  }
+
+  async function exportRegionsCsv() {
+    geoError.value = "";
+    geoSuccess.value = "";
+    try {
+      await downloadBackendCsv("/geo/regions/export", "regions_sante_aproximite.csv");
+      geoSuccess.value = "Export des regions telecharge";
+    } catch (err) {
+      geoError.value = err.message || "Export des regions impossible";
+    }
+  }
+
+  async function exportDistrictsCsv() {
+    geoError.value = "";
+    geoSuccess.value = "";
+    try {
+      await downloadBackendCsv("/geo/districts/export", "districts_sante_aproximite.csv");
+      geoSuccess.value = "Export des districts telecharge";
+    } catch (err) {
+      geoError.value = err.message || "Export des districts impossible";
+    }
+  }
+
+  async function exportEspcCsv() {
+    geoError.value = "";
+    geoSuccess.value = "";
+    try {
+      await downloadBackendCsv("/centers/export/espc", "espc_sante_aproximite.csv");
+      geoSuccess.value = "Export des ESPC telecharge";
+    } catch (err) {
+      geoError.value = err.message || "Export des ESPC impossible";
+    }
+  }
+
   async function onImportFileChange(event) {
     importError.value = "";
     importSuccess.value = "";
@@ -1870,6 +2009,7 @@ const _store = (() => {
     fetchRegions, fetchDistricts, createRegion, createDistrict,
     onRegionImportFileChange, onDistrictImportFileChange,
     importRegionsFromFile, importDistrictsFromFile,
+    exportRegionsCsv, exportDistrictsCsv, exportEspcCsv,
     // users
     users, usersSearch, userCategory, usersError, usersSuccess,
     settingsSection, editingUserId, userRoleOptions, userCategoryMenu,

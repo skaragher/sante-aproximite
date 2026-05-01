@@ -5,6 +5,7 @@ import {
   createCenter,
   deleteCenterByAdmin,
   deleteAllCenters,
+  exportEspcCenters,
   getCenterComplaints,
   getAllCenters,
   getCentersSync,
@@ -27,6 +28,7 @@ const CENTER_CREATE_ROLES = [...new Set([...ETABLISSEMENT_ROLES, ...ADMIN_ROLES]
 router.get("/", requireAuth, getAllCenters);
 router.get("/sync", requireAuth, getCentersSync);
 router.get("/nearby", requireAuth, getNearbyCenters);
+router.get("/export/espc", requireAuth, requireRole(ADMIN_ROLES), exportEspcCenters);
 router.get("/pending", requireAuth, requireRole(ADMIN_ROLES), listPendingCenters);
 router.delete("/all", requireAuth, requireRole(ADMIN_ROLES), deleteAllCenters);
 router.get("/:id/complaints", requireAuth, getCenterComplaints);

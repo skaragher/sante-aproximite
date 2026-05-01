@@ -33,6 +33,23 @@ function mapDistrict(row) {
   };
 }
 
+function csvCell(value) {
+  const text = String(value ?? "");
+  if (/[;"\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function sendCsv(res, filename, headers, rows) {
+  const content = [
+    headers.join(";"),
+    ...rows.map((row) => row.map((value) => csvCell(value)).join(";"))
+  ].join("\n");
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.send(`\uFEFF${content}`);
+}
+
 export async function listRegions(req, res) {
   const result = await pool.query(
     `
@@ -50,6 +67,31 @@ export async function listRegions(req, res) {
     `
   );
   return res.json(result.rows.map(mapRegion));
+}
+
+export async function exportRegions(req, res) {
+  const result = await pool.query(
+    `
+      SELECT
+        r.code,
+        r.name,
+        (
+          SELECT COUNT(*)
+          FROM districts d
+          WHERE d.region_code = r.code
+        ) AS district_count,
+        r.created_at
+      FROM regions r
+      ORDER BY r.name ASC;
+    `
+  );
+
+  return sendCsv(
+    res,
+    "regions_sante_aproximite.csv",
+    ["code", "name", "districtCount", "createdAt"],
+    result.rows.map((row) => [row.code, row.name, Number(row.district_count || 0), row.created_at || ""])
+  );
 }
 
 export async function createRegion(req, res) {
@@ -153,6 +195,29 @@ export async function listDistricts(req, res) {
     params
   );
   return res.json(result.rows.map(mapDistrict));
+}
+
+export async function exportDistricts(req, res) {
+  const result = await pool.query(
+    `
+      SELECT
+        d.code,
+        d.name,
+        d.region_code,
+        r.name AS region_name,
+        d.created_at
+      FROM districts d
+      JOIN regions r ON r.code = d.region_code
+      ORDER BY r.name ASC, d.name ASC;
+    `
+  );
+
+  return sendCsv(
+    res,
+    "districts_sante_aproximite.csv",
+    ["code", "name", "regionCode", "regionName", "createdAt"],
+    result.rows.map((row) => [row.code, row.name, row.region_code, row.region_name || "", row.created_at || ""])
+  );
 }
 
 export async function createDistrict(req, res) {

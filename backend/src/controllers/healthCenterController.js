@@ -344,6 +344,27 @@ function mapCenterRow(row) {
   };
 }
 
+function csvCell(value, delimiter = ",") {
+  const text = String(value ?? "");
+  const delimiterPattern = delimiter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (new RegExp(`[${delimiterPattern}"\\n\\r]`).test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function sendCsv(res, filename, headers, rows, options = {}) {
+  const delimiter = options.delimiter || ",";
+  const content = [
+    headers.map((value) => csvCell(value, delimiter)).join(delimiter),
+    ...rows.map((row) => row.map((value) => csvCell(value, delimiter)).join(delimiter))
+  ].join("\n");
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.send(`\uFEFF${content}`);
+}
+
 function normalizeServices(services) {
   if (typeof services === "string") {
     return services
@@ -855,6 +876,70 @@ export async function getAllCenters(req, res) {
   return res.json(result.rows.map(mapCenterRow));
 }
 
+export async function exportEspcCenters(req, res) {
+  const result = await pool.query(
+    `
+      SELECT
+        hc.name,
+        hc.address,
+        hc.latitude,
+        hc.longitude,
+        hc.technical_platform,
+        hc.level,
+        hc.establishment_type,
+        hc.establishment_code,
+        hc.region_code,
+        hc.district_code,
+        COALESCE((
+          SELECT string_agg(trim(s.name), ', ' ORDER BY trim(s.name))
+          FROM health_center_services s
+          WHERE s.center_id = hc.id
+            AND trim(coalesce(s.name, '')) <> ''
+        ), '') AS services
+      FROM health_centers hc
+      WHERE
+        hc.level IN ('ESPC', 'CENTRE_SANTE', 'CLINIQUE_PRIVEE')
+        OR upper(hc.name) LIKE '%ESPC%'
+        OR upper(hc.name) LIKE '%PREMIER CONTACT%'
+        OR upper(coalesce(hc.technical_platform, '')) LIKE '%ESPC%'
+        OR upper(coalesce(hc.technical_platform, '')) LIKE '%PREMIER CONTACT%'
+        OR upper(coalesce(hc.establishment_code, '')) LIKE '%ESPC%'
+      ORDER BY hc.name ASC;
+    `
+  );
+
+  return sendCsv(
+    res,
+    "espc_sante_aproximite.csv",
+    [
+      "name",
+      "address",
+      "latitude",
+      "longitude",
+      "technicalPlatform",
+      "level",
+      "establishmentType",
+      "establishmentCode",
+      "regionCode",
+      "districtCode",
+      "services"
+    ],
+    result.rows.map((row) => [
+      row.name,
+      row.address,
+      row.latitude ?? "",
+      row.longitude ?? "",
+      row.technical_platform || "",
+      row.level || "",
+      row.establishment_type || "",
+      row.establishment_code || "",
+      row.region_code || "",
+      row.district_code || "",
+      row.services || ""
+    ])
+  );
+}
+
 export async function getCentersSync(req, res) {
   const viewerId = Number(req.user.id);
   const sinceRaw = typeof req.query?.since === "string" ? req.query.since.trim() : "";
@@ -1023,8 +1108,20 @@ export async function importCenters(req, res) {
     });
   }
 
-  const allRegions = await pool.query("SELECT code FROM regions");
-  const regionSet = new Set(allRegions.rows.map((row) => String(row.code || "").toUpperCase()));
+  const allRegions = await pool.query("SELECT code, name FROM regions");
+  const regionSet = new Set();
+  const regionNameToCode = new Map();
+  allRegions.rows.forEach((row) => {
+    const code = String(row.code || "").toUpperCase();
+    const name = String(row.name || "").trim().toUpperCase();
+    if (code) {
+      regionSet.add(code);
+      regionNameToCode.set(code, code);
+    }
+    if (name) {
+      regionNameToCode.set(name, code);
+    }
+  });
   const allDistricts = await pool.query("SELECT code, region_code FROM districts");
   const districtToRegion = new Map(
     allDistricts.rows.map((row) => [
@@ -1034,9 +1131,14 @@ export async function importCenters(req, res) {
   );
 
   normalizedCenters.forEach((center, index) => {
-    const normalizedRegion = String(center.regionCode || "").toUpperCase();
-    if (!regionSet.has(normalizedRegion)) {
-      errors.push({ index, message: `Region introuvable: ${normalizedRegion}` });
+    const normalizedRegionInput = String(center.regionCode || "").toUpperCase();
+    const resolvedRegion = regionNameToCode.get(normalizedRegionInput) || normalizedRegionInput;
+    center.regionCode = resolvedRegion;
+
+    if (resolvedRegion && !regionSet.has(resolvedRegion)) {
+      // Some legacy files use numeric region codes (for example "01") that are
+      // not present in the regions table. Keep the imported value instead of
+      // blocking the whole file so export/import round-trips stay possible.
       return;
     }
 
@@ -1044,13 +1146,13 @@ export async function importCenters(req, res) {
     if (!normalizedDistrict) return;
     const districtRegion = districtToRegion.get(normalizedDistrict);
     if (!districtRegion) {
-      errors.push({ index, message: `District introuvable: ${normalizedDistrict}` });
+      // Same tolerance as region codes: preserve unknown legacy district codes.
       return;
     }
-    if (districtRegion !== normalizedRegion) {
+    if (resolvedRegion && regionSet.has(resolvedRegion) && districtRegion !== resolvedRegion) {
       errors.push({
         index,
-        message: `Le district ${normalizedDistrict} n'appartient pas a la region ${normalizedRegion}`
+        message: `Le district ${normalizedDistrict} n'appartient pas a la region ${resolvedRegion}`
       });
     }
   });
