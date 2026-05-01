@@ -631,7 +631,12 @@ export async function getNearbyCenters(req, res) {
   const lat = toNumber(req.query.latitude);
   const lon = toNumber(req.query.longitude);
   const requestedRadiusKm = toNumber(req.query.radiusKm);
-  const radiusKm = requestedRadiusKm == null ? 30 : Math.min(700, Math.max(1, requestedRadiusKm));
+  if (requestedRadiusKm != null && (requestedRadiusKm < 1 || requestedRadiusKm > 700)) {
+    return res.status(400).json({
+      message: "Rayon de recherche trop grand. Entrez une valeur comprise entre 1 et 700 km."
+    });
+  }
+  const radiusKm = requestedRadiusKm == null ? 30 : requestedRadiusKm;
   const viewerId = Number(req.user.id);
   const scope = await getRequesterScope(req);
 

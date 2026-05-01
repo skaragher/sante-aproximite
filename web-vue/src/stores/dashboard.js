@@ -994,12 +994,15 @@ const _store = (() => {
     info.value = "";
     try {
       const baseRadius = Number(radiusKm.value) || 20;
+      if (!Number.isFinite(baseRadius) || baseRadius < 1 || baseRadius > 700) {
+        throw new Error("Rayon de recherche trop grand. Entrez une valeur comprise entre 1 et 700 km.");
+      }
       nearbyCenters.value = await apiFetch(
         `/centers/nearby?latitude=${coords.value.lat}&longitude=${coords.value.lon}&radiusKm=${baseRadius}`,
         { token: auth.state.token }
       );
       if (expandIfEmpty && nearbyCenters.value.length === 0) {
-        for (const r of [50, 100, 200, 500]) {
+        for (const r of [50, 100, 200, 500, 700]) {
           if (r <= baseRadius) continue;
           const widened = await apiFetch(
             `/centers/nearby?latitude=${coords.value.lat}&longitude=${coords.value.lon}&radiusKm=${r}`,

@@ -2,7 +2,7 @@
   <section class="panel">
     <div class="toolbar">
       <label>Rayon (km)</label>
-      <input v-model.number="store.radiusKm" type="number" min="1" max="5000" />
+      <input v-model.number="store.radiusKm" type="number" min="1" max="700" />
       <input
         v-model="store.nearbySearch"
         type="text"
