@@ -397,20 +397,6 @@ export function NearbyScreen() {
           </Text>
         </View>
       ) : null}
-      {!isMapFullscreen ? (
-        <View style={styles.catalogInfoBox}>
-          <Text style={styles.catalogInfoTitle}>
-            {catalogStatus.ready ? "Success" : "Base locale en attente"}
-          </Text>
-          <Text style={styles.catalogInfoText}>
-            Derniere sync : {catalogStatus.lastSyncAt ? new Date(catalogStatus.lastSyncAt).toLocaleString() : "-"}
-          </Text>
-          <Text style={styles.catalogInfoText}>
-            Nombre de centres locaux : {catalogStatus.centerCount}
-          </Text>
-        </View>
-      ) : null}
-
       <View style={isMapFullscreen ? styles.mapFullscreenWrap : undefined}>
         <MapView
           ref={mapRef}
@@ -689,17 +675,6 @@ const styles = StyleSheet.create({
   },
   noticeBarTextSuccess: { color: C.green },
   noticeBarTextInfo: { color: C.primary },
-  catalogInfoBox: {
-    backgroundColor: "#ecfdf5",
-    borderBottomWidth: 1,
-    borderBottomColor: "#bbf7d0",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  catalogInfoTitle: { color: C.green, fontSize: 12, fontWeight: "800" },
-  catalogInfoText: { color: C.textMed, fontSize: 11 },
-
   map: { height: 260, width: "100%" },
   mapFullscreenWrap: { flex: 1 },
   mapFullscreen: { flex: 1, width: "100%" },
