@@ -140,6 +140,7 @@ export function NearbyScreen() {
       const parsedRadius = parseRadiusKm(radiusKm);
       if (parsedRadius === null) throw new Error("Rayon invalide. Entrez une valeur entre 1 et 700 km.");
       const localCatalog = await loadCenterCatalog(token);
+      const shouldForceFullSync = parsedRadius >= 500;
       if (localCatalog.centers.length === 0) {
         const syncResult = await syncCenterCatalog(token, { forceFull: true });
         const alreadyNotified = await getCenterCatalogMeta(META_KEY_INITIAL_LOAD_NOTIFIED);
@@ -149,7 +150,7 @@ export function NearbyScreen() {
         }
       } else {
         applyCatalogToState(localCatalog, position, radiusKm);
-        syncCenterCatalog(token)
+        syncCenterCatalog(token, { forceFull: shouldForceFullSync })
           .then((syncResult) => {
             applyCatalogToState(syncResult, position, radiusKm);
           })

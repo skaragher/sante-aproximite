@@ -782,8 +782,7 @@ export async function getNearbyCenters(req, res) {
         ), '[]'::json) AS services
       FROM centers_with_distance cwd
       ${filterClause}
-      ORDER BY cwd.distance_km ASC
-      LIMIT 600;
+      ORDER BY cwd.distance_km ASC;
     `,
     params
   );
