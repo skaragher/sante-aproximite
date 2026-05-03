@@ -11,6 +11,7 @@
         </p>
       </div>
       <div class="roles-header-badge">
+        <span v-if="saveNotice" class="roles-save-notice">✔ {{ saveNotice }}</span>
         <span class="roles-superadmin-badge">👑 Super Admin — NATIONAL</span>
       </div>
     </div>
@@ -60,7 +61,9 @@
                 v-for="role in ROLES"
                 :key="role.key"
                 class="roles-check-cell"
-                :class="perm.roles[role.key] ? 'roles-has' : 'roles-no'"
+                :class="[perm.roles[role.key] ? 'roles-has' : 'roles-no', isNational ? 'roles-editable' : '']"
+                :title="isNational ? (perm.roles[role.key] ? 'Cliquer pour retirer ce droit' : 'Cliquer pour accorder ce droit') : ''"
+                @click="isNational && togglePerm(perm, role.key)"
               >
                 <span v-if="perm.roles[role.key]" class="roles-check-yes" :style="`color:${role.color}`">✔</span>
                 <span v-else class="roles-check-no">○</span>
@@ -139,7 +142,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useDashboardStore } from "../../stores/dashboard";
 import { useAuthStore } from "../../stores/auth";
 
@@ -147,6 +150,7 @@ const store = useDashboardStore();
 const auth = useAuthStore();
 
 onMounted(async () => {
+  loadPermissions();
   if (store.users.length === 0) await store.fetchUsers();
 });
 
@@ -172,8 +176,44 @@ const ROLES = [
   { key: "USER",             label: "Utilisateur",    icon: "👤",  color: "#64748b", desc: "Utilisateur public — lecture et évaluation uniquement." },
 ];
 
+// ─── Persistence locale des permissions ───────────────────────────────────────
+const STORAGE_KEY = "sante_role_permissions_v1";
+const saveNotice = ref("");
+
+function persistPermissions() {
+  const snapshot = {};
+  for (const section of permissions) {
+    for (const perm of section.items) {
+      snapshot[perm.id] = { ...perm.roles };
+    }
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  saveNotice.value = "Modifications enregistrées";
+  setTimeout(() => { saveNotice.value = ""; }, 2500);
+}
+
+function loadPermissions() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    for (const section of permissions) {
+      for (const perm of section.items) {
+        if (saved[perm.id]) {
+          Object.assign(perm.roles, saved[perm.id]);
+        }
+      }
+    }
+  } catch {}
+}
+
+function togglePerm(perm, roleKey) {
+  perm.roles[roleKey] = !perm.roles[roleKey];
+  persistPermissions();
+}
+
 // ─── Matrice des permissions ───────────────────────────────────────────────────
-const permissions = [
+const permissions = reactive([
   {
     section: "ADMINISTRATION",
     icon: "🔴",
@@ -340,7 +380,7 @@ const permissions = [
       },
     ]
   },
-];
+]);
 
 // ─── Gestion utilisateurs par rôle ────────────────────────────────────────────
 const selectedRoleFilter = ref("NATIONAL");
@@ -429,6 +469,9 @@ function roleColor(role) {
 .roles-has { background: #f0fdf4; }
 .roles-check-yes { font-size: 1rem; font-weight: 700; }
 .roles-check-no { font-size: 1rem; color: #d1d5db; }
+.roles-editable { cursor: pointer; transition: background .15s, transform .1s; }
+.roles-editable:hover { background: #eff6ff !important; outline: 2px solid #bfdbfe; outline-offset: -2px; transform: scale(1.08); }
+.roles-save-notice { background: #dcfce7; color: #15803d; border: 1px solid #86efac; border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; font-weight: 700; margin-right: 10px; }
 
 /* ── Gestion utilisateurs ── */
 .roles-mgmt-section { background: #fff; border-radius: 14px; padding: 20px 24px; box-shadow: 0 2px 8px rgba(0,0,0,.07); display: flex; flex-direction: column; gap: 16px; }
