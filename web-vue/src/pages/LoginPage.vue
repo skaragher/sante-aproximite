@@ -1,12 +1,19 @@
 <template>
   <main class="auth-wrap">
-    <!-- Left brand panel -->
+
+    <!-- ═══ Left brand panel ═══ -->
     <section class="auth-brand">
+      <div class="auth-brand-blob-1"></div>
+      <div class="auth-brand-blob-2"></div>
+      <div class="auth-brand-blob-3"></div>
+
       <div class="auth-brand-logo">
         <img src="/logo-web.svg" alt="logo" />
       </div>
-      <h1>Sante Aproximite</h1>
-      <p>Plateforme de gestion et de pilotage des etablissements sanitaires.</p>
+
+      <h1>Sante<br/>Aproximite</h1>
+      <p>Plateforme de gestion et de pilotage des etablissements sanitaires de proximite.</p>
+
       <div class="auth-brand-features">
         <div class="auth-feature">
           <span class="auth-feature-icon">🏥</span>
@@ -25,46 +32,61 @@
           Gestion des plaintes et evaluations
         </div>
       </div>
+
+      <div class="auth-brand-footer">
+        <span class="auth-brand-version">v1.0.0 &nbsp;·&nbsp; &copy; {{ new Date().getFullYear() }} Sante Aproximite</span>
+      </div>
     </section>
 
-    <!-- Right form panel -->
+    <!-- ═══ Right form panel ═══ -->
     <section class="auth-form-panel">
       <div class="auth-card">
+
+        <div class="auth-card-logo">
+          <img src="/logo-web.svg" alt="logo" />
+        </div>
+
         <div class="auth-card-header">
-          <h2>Connexion</h2>
-          <p>Entrez vos identifiants pour acceder a la plateforme.</p>
+          <h2>Bienvenue 👋</h2>
+          <p>Connectez-vous pour acceder a votre espace de gestion sanitaire.</p>
         </div>
 
         <form @submit.prevent="submit" class="form-grid">
           <div class="form-field">
             <label for="login-email">Adresse email</label>
-            <input
-              id="login-email"
-              v-model="form.email"
-              type="email"
-              placeholder="vous@exemple.com"
-              required
-              autocomplete="email"
-            />
+            <div class="form-input-wrap">
+              <span class="form-input-icon">✉️</span>
+              <input
+                id="login-email"
+                v-model="form.email"
+                type="email"
+                placeholder="vous@exemple.com"
+                required
+                autocomplete="email"
+              />
+            </div>
           </div>
 
           <div class="form-field">
             <label for="login-password">Mot de passe</label>
-            <input
-              id="login-password"
-              v-model="form.password"
-              type="password"
-              placeholder="••••••••"
-              required
-              autocomplete="current-password"
-            />
+            <div class="form-input-wrap">
+              <span class="form-input-icon">🔒</span>
+              <input
+                id="login-password"
+                v-model="form.password"
+                type="password"
+                placeholder="••••••••"
+                required
+                autocomplete="current-password"
+              />
+            </div>
           </div>
 
           <p v-if="error" class="error">{{ error }}</p>
 
           <div class="form-actions">
             <button class="btn-full" :disabled="loading">
-              {{ loading ? "Connexion en cours..." : "Se connecter" }}
+              {{ loading ? "Connexion en cours..." : "Se connecter →" }}
             </button>
           </div>
         </form>
@@ -73,8 +95,14 @@
           Pas encore de compte ?
           <router-link to="/register">Creer un compte</router-link>
         </div>
+
+        <div class="auth-secure-badge">
+          <span>🔒</span> Plateforme securisee — acces restreint aux personnels autorises
+        </div>
+
       </div>
     </section>
+
   </main>
 </template>
 
