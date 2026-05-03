@@ -48,7 +48,8 @@ const _store = (() => {
     const allowed = ["overview", "nearby"];
     if (isEmergencyResponder.value) allowed.push("emergency-alerts");
     if (isRegulator.value)
-      allowed.push("complaints", "evaluations", "settings", "imports");
+      allowed.push("complaints", "evaluations", "settings", "imports", "roles");
+    if (hasAnyRole(["NATIONAL", "REGULATOR"])) allowed.push("roles");
     if (allowed.includes(requested)) return requested;
     if (isEmergencyResponder.value) return "emergency-alerts";
     return "overview";

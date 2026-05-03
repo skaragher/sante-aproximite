@@ -33,6 +33,9 @@
     <ImportsSection
       v-if="store.tab === 'imports' && store.isRegulator"
     />
+    <RolesSection
+      v-if="store.tab === 'roles' && store.isRegulator"
+    />
   </main>
 </template>
 
@@ -50,6 +53,7 @@ import NearbySection from "../components/dashboard/NearbySection.vue";
 import OverviewSection from "../components/dashboard/OverviewSection.vue";
 import SamuSection from "../components/dashboard/SamuSection.vue";
 import SapeurPompierSection from "../components/dashboard/SapeurPompierSection.vue";
+import RolesSection from "../components/dashboard/RolesSection.vue";
 import SettingsSection from "../components/dashboard/SettingsSection.vue";
 
 const normalizeRole = (v) => String(v || "").trim().toUpperCase().replace(/[\s-]+/g, "_");

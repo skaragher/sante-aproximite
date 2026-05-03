@@ -148,6 +148,9 @@ const menuItems = computed(() => {
     pushItem({ tab: "evaluations", label: "Evaluations", icon: "📊", section: "QUALITE", decor: "📈" });
     pushItem({ tab: "settings", label: "Parametres", icon: "⚙", section: "GOUVERNANCE", decor: "👥" });
     pushItem({ tab: "imports", label: "Importations", icon: "📥", section: "GOUVERNANCE", decor: "👥" });
+    if (hasAnyRole(["NATIONAL", "REGULATOR"])) {
+      pushItem({ tab: "roles", label: "Gestion des roles", icon: "🛡", section: "GOUVERNANCE", decor: "👥" });
+    }
   }
 
   return items;

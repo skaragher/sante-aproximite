@@ -182,21 +182,37 @@ export async function listUsers(req, res) {
   const whereParts = [];
   const params = [];
 
+  // Les comptes publics (rôle USER simple) ne sont pas visibles
+  // pour les niveaux inférieurs à REGULATOR/NATIONAL.
+  const PUBLIC_USER_ROLES = ["USER"];
+  const ADMIN_SCOPED_ROLES = [
+    "NATIONAL","REGULATOR","REGION","DISTRICT",
+    "ETABLISSEMENT","CHEF_ETABLISSEMENT",
+    "SAPEUR_POMPIER","SAMU","POLICE","GENDARMERIE","PROTECTION_CIVILE"
+  ];
+
   if (effectiveRole === "DISTRICT") {
     const districtCode = req.user?.districtCode || null;
-    if (!districtCode) {
-      return res.json([]);
-    }
+    if (!districtCode) return res.json([]);
     whereParts.push(`upper(u.district_code) = $${params.length + 1}`);
     params.push(districtCode);
+    // N'affiche que les comptes administratifs (pas les USER publics)
+    whereParts.push(
+      `u.role = ANY($${params.length + 1}::text[])`
+    );
+    params.push(ADMIN_SCOPED_ROLES);
   } else if (effectiveRole === "REGION") {
     const regionCode = req.user?.regionCode || null;
-    if (!regionCode) {
-      return res.json([]);
-    }
+    if (!regionCode) return res.json([]);
     whereParts.push(`upper(u.region_code) = $${params.length + 1}`);
     params.push(regionCode);
+    // N'affiche que les comptes administratifs (pas les USER publics)
+    whereParts.push(
+      `u.role = ANY($${params.length + 1}::text[])`
+    );
+    params.push(ADMIN_SCOPED_ROLES);
   }
+  // REGULATOR / NATIONAL : pas de filtre, voit tout
 
   const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
