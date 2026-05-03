@@ -489,6 +489,20 @@ export async function updateUser(req, res) {
   }
 
   const current = currentResult.rows[0];
+
+  // Récupérer les rôles actuels de la cible
+  const currentRolesResult = await pool.query(
+    "SELECT role FROM user_roles WHERE user_id = $1",
+    [userId]
+  );
+  const currentTargetRoles = currentRolesResult.rows.map((r) => r.role);
+  const targetIsDeveloper = currentTargetRoles.includes("DEVELOPER") || String(current.role || "").toUpperCase() === "DEVELOPER";
+
+  // Un compte Developer est intouchable — aucun compte ne peut modifier ses rôles
+  if (targetIsDeveloper) {
+    return res.status(403).json({ message: "Les rôles d'un compte Developer sont verrouillés et ne peuvent pas être modifiés." });
+  }
+
   const normalizedRoles = normalizeRolesInput(roles, role || current.role);
   const primaryRole = extractPrimaryRole(normalizedRoles, role || current.role);
   const requesterRole = String(req.user?.role || "").toUpperCase();

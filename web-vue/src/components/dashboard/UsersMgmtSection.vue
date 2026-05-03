@@ -77,18 +77,26 @@
             </td>
 
             <td class="um-cell-roles">
-              <div class="um-listbox">
-                <div
-                  v-for="r in visibleRoles"
-                  :key="r.value"
-                  class="um-lb-row"
-                  :class="{ 'um-lb-sel': getLocalRoles(user.id).includes(r.value) }"
-                  @click="toggleRole(user.id, r.value, user)"
-                >{{ r.label }}</div>
-              </div>
-              <button class="um-save-roles-btn" style="background:#fff;color:#2563eb;border:1px solid #3b82f6;" @click="saveRoles(user)">
-                💾 Enregistrer les rôles
-              </button>
+              <template v-if="isDevUser(user)">
+                <div class="um-dev-roles-locked">
+                  <span class="um-dev-role-badge">🔒 Developer</span>
+                  <span class="um-dev-roles-hint">Rôles verrouillés</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="um-listbox">
+                  <div
+                    v-for="r in visibleRoles"
+                    :key="r.value"
+                    class="um-lb-row"
+                    :class="{ 'um-lb-sel': getLocalRoles(user.id).includes(r.value) }"
+                    @click="toggleRole(user.id, r.value, user)"
+                  >{{ r.label }}</div>
+                </div>
+                <button class="um-save-roles-btn" style="background:#fff;color:#2563eb;border:1px solid #3b82f6;" @click="saveRoles(user)">
+                  💾 Enregistrer les rôles
+                </button>
+              </template>
             </td>
 
             <td class="um-cell-pwd">
@@ -363,6 +371,7 @@ function getLocalRoles(userId) {
 }
 
 function toggleRole(userId, roleValue, user) {
+  if (isDevUser(user)) return;
   if (!localRolesMap[userId]) {
     localRolesMap[userId] = [
       ...(Array.isArray(user.roles) ? user.roles : [user.role]).filter(Boolean)
@@ -374,6 +383,7 @@ function toggleRole(userId, roleValue, user) {
 }
 
 async function saveRoles(user) {
+  if (isDevUser(user)) { showErr("Les rôles d'un compte Developer sont verrouillés."); return; }
   localError.value = "";
   try {
     const roles = getLocalRoles(user.id).filter((r) => r !== "MANAGE_PUBLIC_USERS");
@@ -707,6 +717,19 @@ onMounted(async () => {
 .um-lb-row:last-child { border-bottom: none; }
 .um-lb-row:hover { background: #f3f4f6; }
 .um-lb-sel { background: #808080 !important; color: #fff; font-weight: 600; }
+.um-dev-roles-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #f1f5f9;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 6px;
+}
+.um-dev-role-badge { font-size: 0.78rem; font-weight: 700; color: #475569; }
+.um-dev-roles-hint { font-size: 0.7rem; color: #94a3b8; font-style: italic; }
+
 .um-save-roles-btn {
   width: 100%; background: #ffffff; border: 1px solid #3b82f6;
   color: #2563eb; border-radius: 4px; padding: 5px 10px;
