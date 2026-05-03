@@ -46,8 +46,7 @@
         <div class="ov-card-detail">Taux de validation {{ approvalRate }}%</div>
       </div>
 
-      <div
-        class="ov-card ov-card-red"
+      <div class="ov-card ov-card-red" v-if="!store.isNational"
         :class="{ 'ov-card-clickable': store.isEmergencyResponder }"
         :role="store.isEmergencyResponder ? 'button' : undefined"
         :tabindex="store.isEmergencyResponder ? 0 : undefined"
@@ -60,13 +59,18 @@
         </div>
         <div class="ov-card-value">{{ store.emergencyStats.nonTraite }}</div>
         <div class="ov-card-sub">Sans prise en charge</div>
-        <button
-          v-if="store.emergencyStats.nonTraite > 0 && store.isEmergencyResponder"
-          class="ov-action-btn"
-        >→ Action requise</button>
-        <div class="ov-card-detail" v-else>
-          En cours : {{ store.emergencyStats.enCours }}
+        <button v-if="store.emergencyStats.nonTraite > 0 && store.isEmergencyResponder" class="ov-action-btn">→ Action requise</button>
+        <div class="ov-card-detail" v-else>En cours : {{ store.emergencyStats.enCours }}</div>
+      </div>
+      <!-- NATIONAL : pas d'accès direct aux données opérationnelles des services d'urgence -->
+      <div class="ov-card ov-card-slate" v-else>
+        <div class="ov-card-top">
+          <span class="ov-card-tag">🏛 RÉFÉRENTIEL</span>
+          <span class="ov-card-icon-bg" style="background:#f1f5f9">🏛</span>
         </div>
+        <div class="ov-card-value">{{ store.regions.length }}</div>
+        <div class="ov-card-sub">Régions actives</div>
+        <div class="ov-card-detail">Districts : {{ store.districts?.length || '—' }}</div>
       </div>
 
       <div class="ov-card ov-card-orange">
@@ -106,9 +110,13 @@
           <span class="ov-summary-val">{{ approvalRate }}%</span>
           <span class="ov-summary-lbl">Taux validation</span>
         </div>
-        <div class="ov-summary-stat ov-summary-red">
+        <div class="ov-summary-stat ov-summary-red" v-if="!store.isNational">
           <span class="ov-summary-val">{{ store.emergencyStats.nonTraite }}</span>
           <span class="ov-summary-lbl">Alertes</span>
+        </div>
+        <div class="ov-summary-stat" v-else>
+          <span class="ov-summary-val">{{ store.districts?.length || '—' }}</span>
+          <span class="ov-summary-lbl">Districts</span>
         </div>
       </div>
     </div>
@@ -208,10 +216,10 @@
         <div class="ov-theme-cta">Voir la carte →</div>
       </div>
 
-      <!-- Urgences -->
+      <!-- Urgences : masqué pour NATIONAL (pas d'accès aux données opérationnelles) -->
       <div
         class="ov-theme-block ov-theme-red"
-        v-if="store.isEmergencyResponder"
+        v-if="store.isEmergencyResponder && !store.isNational"
         @click="store.tab = 'emergency-alerts'"
         role="button" tabindex="0"
         @keydown.enter.prevent="store.tab = 'emergency-alerts'"
@@ -239,7 +247,7 @@
         </div>
         <div class="ov-theme-cta">Gérer les alertes →</div>
       </div>
-      <div class="ov-theme-block ov-theme-red ov-theme-muted" v-else>
+      <div class="ov-theme-block ov-theme-red ov-theme-muted" v-else-if="!store.isNational">
         <div class="ov-theme-header">
           <span class="ov-theme-icon">🚨</span>
           <div>
@@ -334,7 +342,7 @@
     <div class="ov-actions">
       <button @click="store.fetchAllCenters">Actualiser</button>
       <button class="secondary" @click="store.tab = 'nearby'">Centres proches</button>
-      <button class="secondary" v-if="store.isEmergencyResponder" @click="store.tab = 'emergency-alerts'">Alertes d'urgence</button>
+      <button class="secondary" v-if="store.isEmergencyResponder && !store.isNational" @click="store.tab = 'emergency-alerts'">Alertes d'urgence</button>
     </div>
 
     <p v-if="store.error" class="error">{{ store.error }}</p>

@@ -69,7 +69,7 @@ const store = useDashboardStore();
 onMounted(() => {
   store.tab = store.resolveTab(route.query.tab);
 
-  if (store.isEmergencyResponder) {
+  if (store.isEmergencyResponder && !store.isNational) {
     store.fetchEmergencyAlerts();
     store.startEmergencyAutoRefresh();
   }

@@ -38,6 +38,12 @@ const _store = (() => {
       "ETABLISSEMENT", "CHEF_ETABLISSEMENT", "SAMU", "SAPEUR_POMPIER"
     ])
   );
+  // NATIONAL est un compte santé administratif pur — pas d'accès aux services opérationnels
+  // d'urgence (SAMU, Pompiers) ni aux forces de l'ordre (Police, Gendarmerie)
+  const isNational = computed(() => hasAnyRole(["NATIONAL"]));
+  const isHealthAdmin = computed(() =>
+    hasAnyRole(["NATIONAL", "REGULATOR", "REGION", "DISTRICT"])
+  );
 
   // ─── Tab ────────────────────────────────────────────────────────────────────
   const tab = ref("overview");
@@ -1966,7 +1972,7 @@ const _store = (() => {
 
   return reactive({
     // roles
-    authRoles, isChef, isRegulator, isEmergencyResponder, canManageUsers,
+    authRoles, isChef, isRegulator, isEmergencyResponder, canManageUsers, isNational, isHealthAdmin,
     hasAnyRole, hasApprovedChefCenter, canSeeComplaintsPanel, canHandleComplaintActions,
     // tab
     tab, resolveTab,

@@ -225,8 +225,16 @@ export async function listUsers(req, res) {
   const whereParts = [];
   const params = [];
 
+  // Rôles que NATIONAL peut gérer : uniquement les comptes du système de santé
+  // (pas SAMU opérationnel, pas Police, Gendarmerie — chaînes de commandement distinctes)
+  const NATIONAL_HEALTH_ROLES = [
+    "NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","USER"
+  ];
+
   if (effectiveRole === "NATIONAL") {
-    // Voit tous les utilisateurs (y compris les publics USER)
+    // NATIONAL voit uniquement les comptes du système de santé
+    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
+    params.push(NATIONAL_HEALTH_ROLES);
   } else if (effectiveRole === "REGULATOR") {
     // Voit tous les comptes admin (exclut les USER publics)
     if (canManagePublicUsers) {
@@ -330,7 +338,8 @@ export async function listUsers(req, res) {
 
 // Rôles qu'un niveau peut créer (hiérarchie descendante uniquement)
 const CREATABLE_ROLES_BY_LEVEL = {
-  NATIONAL:          null, // pas de restriction
+  // NATIONAL gère uniquement le système de santé — pas les services d'urgence/sécurité
+  NATIONAL:          ["NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","USER"],
   REGULATOR:         ["REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER","USER"],
   REGION:            ["DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
   DISTRICT:          ["ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
