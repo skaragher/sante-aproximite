@@ -11,7 +11,12 @@ import {
 import { requireAuth, requireRole } from "../middlewares/authMiddleware.js";
 
 const router = Router();
-const ADMIN_ROLES = ["REGULATOR", "NATIONAL", "REGION", "DISTRICT"];
+const ADMIN_ROLES = [
+  "NATIONAL", "REGULATOR",
+  "REGION", "DISTRICT",
+  "ETABLISSEMENT", "CHEF_ETABLISSEMENT",
+  "SAMU", "SAPEUR_POMPIER"
+];
 
 router.use(requireAuth, requireRole(ADMIN_ROLES));
 router.get("/", listUsers);

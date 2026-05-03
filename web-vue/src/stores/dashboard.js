@@ -32,6 +32,12 @@ const _store = (() => {
   const isEmergencyResponder = computed(() =>
     hasAnyRole(["SAMU", "SAPEUR_POMPIER"])
   );
+  const canManageUsers = computed(() =>
+    hasAnyRole([
+      "NATIONAL", "REGULATOR", "REGION", "DISTRICT",
+      "ETABLISSEMENT", "CHEF_ETABLISSEMENT", "SAMU", "SAPEUR_POMPIER"
+    ])
+  );
 
   // ─── Tab ────────────────────────────────────────────────────────────────────
   const tab = ref("overview");
@@ -50,6 +56,7 @@ const _store = (() => {
     if (isRegulator.value)
       allowed.push("complaints", "evaluations", "settings", "imports", "roles");
     if (hasAnyRole(["NATIONAL", "REGULATOR"])) allowed.push("roles");
+    if (canManageUsers.value) allowed.push("settings");
     if (allowed.includes(requested)) return requested;
     if (isEmergencyResponder.value) return "emergency-alerts";
     return "overview";
@@ -1959,7 +1966,7 @@ const _store = (() => {
 
   return reactive({
     // roles
-    authRoles, isChef, isRegulator, isEmergencyResponder,
+    authRoles, isChef, isRegulator, isEmergencyResponder, canManageUsers,
     hasAnyRole, hasApprovedChefCenter, canSeeComplaintsPanel, canHandleComplaintActions,
     // tab
     tab, resolveTab,

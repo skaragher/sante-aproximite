@@ -37,6 +37,7 @@
         <span class="settings-badge">{{ store.users.length }}</span>
       </button>
       <button
+        v-if="canSeeCentersTab"
         type="button"
         class="ghost settings-switch-btn"
         :class="{ active: store.settingsSection === 'centers' }"
@@ -295,7 +296,7 @@
     </div>
 
     <!-- ── CENTERS ── -->
-    <div v-else class="settings-grid settings-centers-layout">
+    <div v-else-if="canSeeCentersTab" class="settings-grid settings-centers-layout">
 
       <!-- Geo forms -->
       <article class="card settings-card">
@@ -747,9 +748,12 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { useAuthStore } from "../../stores/auth";
 import { useDashboardStore } from "../../stores/dashboard";
 
 const store = useDashboardStore();
 const auth = useAuthStore();
+
+const canSeeCentersTab = computed(() => store.isRegulator);
 </script>

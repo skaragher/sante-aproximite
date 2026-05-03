@@ -170,49 +170,77 @@ async function saveUserRoles(client, userId, roles) {
 }
 
 export async function listUsers(req, res) {
-  const requesterRole = String(req.user?.role || "").toUpperCase();
   const requesterRoles = Array.isArray(req.user?.roles)
     ? req.user.roles.map((r) => String(r || "").toUpperCase())
-    : [requesterRole];
+    : [String(req.user?.role || "").toUpperCase()];
 
+  // Priorité de rôle la plus haute du requérant
+  const ROLE_PRIORITY = [
+    "NATIONAL", "REGULATOR", "REGION", "DISTRICT",
+    "ETABLISSEMENT", "CHEF_ETABLISSEMENT", "SAMU", "SAPEUR_POMPIER"
+  ];
   const effectiveRole =
-    ["REGULATOR", "NATIONAL", "REGION", "DISTRICT"].find((r) => requesterRoles.includes(r)) ||
-    requesterRole;
+    ROLE_PRIORITY.find((r) => requesterRoles.includes(r)) ||
+    requesterRoles[0] || "USER";
 
-  const whereParts = [];
-  const params = [];
-
-  // Les comptes publics (rôle USER simple) ne sont pas visibles
-  // pour les niveaux inférieurs à REGULATOR/NATIONAL.
-  const PUBLIC_USER_ROLES = ["USER"];
   const ADMIN_SCOPED_ROLES = [
     "NATIONAL","REGULATOR","REGION","DISTRICT",
     "ETABLISSEMENT","CHEF_ETABLISSEMENT",
     "SAPEUR_POMPIER","SAMU","POLICE","GENDARMERIE","PROTECTION_CIVILE"
   ];
 
-  if (effectiveRole === "DISTRICT") {
-    const districtCode = req.user?.districtCode || null;
-    if (!districtCode) return res.json([]);
-    whereParts.push(`upper(u.district_code) = $${params.length + 1}`);
-    params.push(districtCode);
-    // N'affiche que les comptes administratifs (pas les USER publics)
-    whereParts.push(
-      `u.role = ANY($${params.length + 1}::text[])`
-    );
+  const whereParts = [];
+  const params = [];
+
+  if (effectiveRole === "NATIONAL") {
+    // Voit tous les utilisateurs (y compris les publics USER)
+  } else if (effectiveRole === "REGULATOR") {
+    // Voit tous les comptes admin (exclut les USER publics)
+    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
     params.push(ADMIN_SCOPED_ROLES);
   } else if (effectiveRole === "REGION") {
     const regionCode = req.user?.regionCode || null;
     if (!regionCode) return res.json([]);
     whereParts.push(`upper(u.region_code) = $${params.length + 1}`);
     params.push(regionCode);
-    // N'affiche que les comptes administratifs (pas les USER publics)
-    whereParts.push(
-      `u.role = ANY($${params.length + 1}::text[])`
-    );
+    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
     params.push(ADMIN_SCOPED_ROLES);
+  } else if (effectiveRole === "DISTRICT") {
+    const districtCode = req.user?.districtCode || null;
+    if (!districtCode) return res.json([]);
+    whereParts.push(`upper(u.district_code) = $${params.length + 1}`);
+    params.push(districtCode);
+    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
+    params.push(ADMIN_SCOPED_ROLES);
+  } else if (effectiveRole === "ETABLISSEMENT" || effectiveRole === "CHEF_ETABLISSEMENT") {
+    // Voit les comptes admin liés à son centre ou son code établissement
+    const centerId = req.user?.centerId || null;
+    const estCode = req.user?.establishmentCode || null;
+    if (!centerId && !estCode) return res.json([]);
+    const orParts = [];
+    if (centerId) {
+      orParts.push(`u.center_id = $${params.length + 1}`);
+      params.push(Number(centerId));
+    }
+    if (estCode) {
+      orParts.push(`upper(u.establishment_code) = $${params.length + 1}`);
+      params.push(estCode);
+    }
+    whereParts.push(`(${orParts.join(" OR ")})`);
+    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
+    params.push(ADMIN_SCOPED_ROLES);
+  } else if (effectiveRole === "SAMU" || effectiveRole === "SAPEUR_POMPIER") {
+    // Voit les comptes de son propre service dans sa région
+    const regionCode = req.user?.regionCode || null;
+    whereParts.push(`u.role = $${params.length + 1}`);
+    params.push(effectiveRole);
+    if (regionCode) {
+      whereParts.push(`upper(u.region_code) = $${params.length + 1}`);
+      params.push(regionCode);
+    }
+  } else {
+    return res.json([]);
   }
-  // REGULATOR / NATIONAL : pas de filtre, voit tout
 
   const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
 
@@ -241,6 +269,18 @@ export async function listUsers(req, res) {
   return res.json(result.rows.map(mapUser));
 }
 
+// Rôles qu'un niveau peut créer (hiérarchie descendante uniquement)
+const CREATABLE_ROLES_BY_LEVEL = {
+  NATIONAL:          null, // pas de restriction
+  REGULATOR:         ["REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER","USER"],
+  REGION:            ["DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
+  DISTRICT:          ["ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
+  ETABLISSEMENT:     ["ETABLISSEMENT","CHEF_ETABLISSEMENT"],
+  CHEF_ETABLISSEMENT:["ETABLISSEMENT","CHEF_ETABLISSEMENT"],
+  SAMU:              ["SAMU"],
+  SAPEUR_POMPIER:    ["SAPEUR_POMPIER"],
+};
+
 export async function createUser(req, res) {
   const { fullName, email, password, role, roles } = req.body;
 
@@ -256,6 +296,21 @@ export async function createUser(req, res) {
 
   const normalizedRoles = normalizeRolesInput(roles, role);
   const primaryRole = normalizedRoles[0];
+
+  // Vérifier que le créateur a le droit de créer ce niveau de rôle
+  const creatorRoles = Array.isArray(req.user?.roles)
+    ? req.user.roles.map((r) => String(r || "").toUpperCase())
+    : [String(req.user?.role || "").toUpperCase()];
+  const ROLE_PRIORITY = ["NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"];
+  const creatorLevel = ROLE_PRIORITY.find((r) => creatorRoles.includes(r)) || creatorRoles[0];
+  const allowedToCreate = CREATABLE_ROLES_BY_LEVEL[creatorLevel];
+  if (allowedToCreate !== null && allowedToCreate !== undefined) {
+    const forbidden = normalizedRoles.find((r) => !allowedToCreate.includes(r));
+    if (forbidden) {
+      return res.status(403).json({ message: `Vous n'avez pas le droit de créer un compte de type ${forbidden}` });
+    }
+  }
+
   let assignment;
   try {
     assignment = await resolveUserAssignment(req.body);

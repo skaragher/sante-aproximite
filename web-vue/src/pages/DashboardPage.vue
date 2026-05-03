@@ -28,7 +28,7 @@
       v-if="store.tab === 'my-center' && store.isChef"
     />
     <SettingsSection
-      v-if="store.tab === 'settings' && store.isRegulator"
+      v-if="store.tab === 'settings' && store.canManageUsers"
     />
     <ImportsSection
       v-if="store.tab === 'imports' && store.isRegulator"
@@ -72,6 +72,10 @@ onMounted(() => {
   if (store.isEmergencyResponder) {
     store.fetchEmergencyAlerts();
     store.startEmergencyAutoRefresh();
+  }
+
+  if (store.canManageUsers && !store.isRegulator) {
+    store.fetchUsers();
   }
 
   if (store.isRegulator) {

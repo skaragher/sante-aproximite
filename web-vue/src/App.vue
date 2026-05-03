@@ -133,6 +133,7 @@ const menuItems = computed(() => {
     pushItem({ tab: "my-center", label: "Mon centre", icon: "🏥", section: "SUIVI SANITAIRE", decor: "🩺" });
     pushItem({ tab: "complaints", label: "Plaintes & Satisfaction", icon: "⭐", section: "SUIVI SANITAIRE", decor: "🩺" });
     pushItem({ tab: "evaluations", label: "Evaluations", icon: "📊", section: "SUIVI SANITAIRE", decor: "🩺" });
+    pushItem({ tab: "settings", label: "Utilisateurs", icon: "👥", section: "GOUVERNANCE", decor: "⚙" });
     return items;
   }
 
@@ -141,6 +142,7 @@ const menuItems = computed(() => {
 
   if (hasAnyRole(emergencyRoleValues)) {
     pushItem({ tab: "emergency-alerts", label: "Alertes urgence", icon: "🚨", section: "URGENCES", decor: "🚨" });
+    pushItem({ tab: "settings", label: "Utilisateurs", icon: "👥", section: "GOUVERNANCE", decor: "⚙" });
   }
 
   if (hasAnyRole([...adminRoles])) {
