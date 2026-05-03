@@ -170,6 +170,36 @@ async function saveUserRoles(client, userId, roles) {
 }
 
 export async function listUsers(req, res) {
+  const requesterRole = String(req.user?.role || "").toUpperCase();
+  const requesterRoles = Array.isArray(req.user?.roles)
+    ? req.user.roles.map((r) => String(r || "").toUpperCase())
+    : [requesterRole];
+
+  const effectiveRole =
+    ["REGULATOR", "NATIONAL", "REGION", "DISTRICT"].find((r) => requesterRoles.includes(r)) ||
+    requesterRole;
+
+  const whereParts = [];
+  const params = [];
+
+  if (effectiveRole === "DISTRICT") {
+    const districtCode = req.user?.districtCode || null;
+    if (!districtCode) {
+      return res.json([]);
+    }
+    whereParts.push(`upper(u.district_code) = $${params.length + 1}`);
+    params.push(districtCode);
+  } else if (effectiveRole === "REGION") {
+    const regionCode = req.user?.regionCode || null;
+    if (!regionCode) {
+      return res.json([]);
+    }
+    whereParts.push(`upper(u.region_code) = $${params.length + 1}`);
+    params.push(regionCode);
+  }
+
+  const whereClause = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
   const result = await pool.query(
     `
       SELECT
@@ -186,8 +216,10 @@ export async function listUsers(req, res) {
         ) AS roles
       FROM users u
       LEFT JOIN health_centers hc ON hc.id = u.center_id
+      ${whereClause}
       ORDER BY u.created_at DESC;
-    `
+    `,
+    params
   );
 
   return res.json(result.rows.map(mapUser));

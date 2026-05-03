@@ -1662,6 +1662,18 @@ export async function reviewCenter(req, res) {
 }
 
 export async function listPendingCenters(req, res) {
+  const scope = await getRequesterScope(req);
+  const whereParts = ["hc.approval_status = 'PENDING'"];
+  const params = [];
+  if (scope.role === "DISTRICT" && scope.districtCode) {
+    whereParts.push(`upper(hc.district_code) = $${params.length + 1}`);
+    params.push(scope.districtCode);
+  } else if (scope.role === "REGION" && scope.regionCode) {
+    whereParts.push(`upper(hc.region_code) = $${params.length + 1}`);
+    params.push(scope.regionCode);
+  }
+  const whereClause = `WHERE ${whereParts.join(" AND ")}`;
+
   const result = await pool.query(
     `
       SELECT
@@ -1687,9 +1699,10 @@ export async function listPendingCenters(req, res) {
           WHERE s.center_id = hc.id
         ), '[]'::json) AS services
       FROM health_centers hc
-      WHERE hc.approval_status = 'PENDING'
+      ${whereClause}
       ORDER BY hc.created_at ASC;
-    `
+    `,
+    params
   );
 
   return res.json(result.rows.map(mapCenterRow));

@@ -18,9 +18,15 @@ export async function requireAuth(req, res, next) {
 
     const userResult = await pool.query(
       `
-        SELECT id, full_name, email, role, is_active
-        FROM users
-        WHERE id = $1
+        SELECT
+          u.id, u.full_name, u.email, u.role, u.is_active,
+          u.region_code, u.district_code, u.establishment_code, u.center_id,
+          COALESCE(
+            (SELECT array_agg(ur.role ORDER BY ur.role) FROM user_roles ur WHERE ur.user_id = u.id),
+            ARRAY[u.role]
+          ) AS roles
+        FROM users u
+        WHERE u.id = $1
         LIMIT 1;
       `,
       [userId]
@@ -34,16 +40,9 @@ export async function requireAuth(req, res, next) {
       return res.status(403).json({ message: "Compte desactive" });
     }
 
-    const rolesResult = await pool.query(
-      `
-        SELECT role
-        FROM user_roles
-        WHERE user_id = $1
-        ORDER BY role ASC;
-      `,
-      [userId]
-    );
-    const roles = rolesResult.rows.map((row) => String(row.role || "").trim().toUpperCase()).filter(Boolean);
+    const roles = (Array.isArray(dbUser.roles) ? dbUser.roles : [])
+      .map((r) => String(r || "").trim().toUpperCase())
+      .filter(Boolean);
     req.user = {
       ...decoded,
       id: String(dbUser.id),
@@ -51,7 +50,11 @@ export async function requireAuth(req, res, next) {
       email: dbUser.email,
       role: String(dbUser.role || "").trim().toUpperCase(),
       roles: roles.length ? roles : [String(dbUser.role || "").trim().toUpperCase()].filter(Boolean),
-      isActive: dbUser.is_active !== false
+      isActive: dbUser.is_active !== false,
+      regionCode: dbUser.region_code ? String(dbUser.region_code).trim().toUpperCase() : null,
+      districtCode: dbUser.district_code ? String(dbUser.district_code).trim().toUpperCase() : null,
+      establishmentCode: dbUser.establishment_code ? String(dbUser.establishment_code).trim().toUpperCase() : null,
+      centerId: dbUser.center_id != null && Number.isInteger(Number(dbUser.center_id)) ? Number(dbUser.center_id) : null
     };
     next();
   } catch {
