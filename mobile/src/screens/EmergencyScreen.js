@@ -214,8 +214,8 @@ export function EmergencyScreen() {
     const acc = Number(coords.accuracyMeters);
     if (acc <= IDEAL_GPS_RADIUS_METERS) return { label: "GPS excellent", color: C.green };
     if (acc <= TARGET_GPS_RADIUS_METERS) return { label: "GPS correct", color: C.green };
-    if (acc <= 50)  return { label: "GPS moyen — envoi autorise", color: C.amber };
-    return { label: "GPS faible — envoi autorise", color: C.orange };
+    if (acc <= 50)  return { label: "GPS moyen - envoi autorise", color: C.amber };
+    return { label: "GPS faible - envoi autorise", color: C.orange };
   }
 
   const gpsInfo = gpsAccuracyInfo();

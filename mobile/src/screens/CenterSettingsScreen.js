@@ -365,7 +365,7 @@ export function CenterSettingsScreen() {
             <View style={styles.cardHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>{center.name}</Text>
-                <Text style={styles.cardCode}>{center.establishmentCode || "—"}</Text>
+                <Text style={styles.cardCode}>{center.establishmentCode || "-"}</Text>
               </View>
               <ApprovalBadge status={center.approvalStatus} />
             </View>

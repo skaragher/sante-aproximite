@@ -503,7 +503,7 @@ export function NearbyScreen() {
               <View style={styles.ratingBar}>
                 <View style={styles.ratingInfo}>
                   <Text style={styles.ratingScore}>
-                    {center.ratingAverage == null ? "—" : `${center.ratingAverage}/5`}
+                    {center.ratingAverage == null ? "-" : `${center.ratingAverage}/5`}
                   </Text>
                   <Text style={styles.ratingCount}>({center.ratingCount || 0} avis)</Text>
                   {center.satisfactionRate != null ? (

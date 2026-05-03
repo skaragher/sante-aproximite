@@ -93,7 +93,7 @@ export function SecurityAlertOpsScreen() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Urgences securitaires</Text>
-          <Text style={styles.headerSub}>{roleName} — traitement des signalements securitaires</Text>
+          <Text style={styles.headerSub}>{roleName} - traitement des signalements securitaires</Text>
         </View>
       </View>
 

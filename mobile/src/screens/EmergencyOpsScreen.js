@@ -21,7 +21,7 @@ function getNextStatus(currentStatus) {
 }
 
 const NEXT_BTN_LABEL = {
-  EN_ROUTE:  "🚗  Je pars — En route",
+  EN_ROUTE:  "🚗  Je pars - En route",
   ON_SITE:   "📍  Je suis sur site",
   COMPLETED: "✅  Terminer l'intervention",
 };

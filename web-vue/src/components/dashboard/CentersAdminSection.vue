@@ -57,7 +57,7 @@
           <form class="ca-modal-form" @submit.prevent="store.createDistrict">
             <strong class="ca-modal-section-title">Créer un district</strong>
             <select v-model="store.districtForm.regionCode" required>
-              <option value="">— Sélectionner une région —</option>
+              <option value="">- Sélectionner une région -</option>
               <option v-for="r in store.regions" :key="r.code" :value="r.code">
                 {{ r.code }} – {{ r.name }}
               </option>
@@ -128,7 +128,7 @@
               <div class="ca-mf-row">
                 <label>Région *</label>
                 <select v-model="store.regulatorCenterForm.regionCode" required @change="store.onRegulatorRegionChange">
-                  <option value="">— Sélectionner une région —</option>
+                  <option value="">- Sélectionner une région -</option>
                   <option v-for="r in store.regions" :key="r.code" :value="r.code">
                     {{ r.code }} – {{ r.name }}
                   </option>
@@ -137,7 +137,7 @@
               <div class="ca-mf-row">
                 <label>District</label>
                 <select v-model="store.regulatorCenterForm.districtCode">
-                  <option value="">— Optionnel —</option>
+                  <option value="">- Optionnel -</option>
                   <option v-for="d in store.availableDistrictsForRegulatorCenter" :key="d.code" :value="d.code">
                     {{ d.code }} – {{ d.name }}
                   </option>
@@ -291,7 +291,7 @@
             <div class="ca-form-row">
               <label>Région</label>
               <select v-model="store.centerAdminForm.regionCode">
-                <option value="">— Aucune —</option>
+                <option value="">- Aucune -</option>
                 <option v-for="r in store.regions" :key="r.code" :value="r.code">
                   {{ r.code }} – {{ r.name }}
                 </option>
@@ -300,7 +300,7 @@
             <div class="ca-form-row">
               <label>District</label>
               <select v-model="store.centerAdminForm.districtCode">
-                <option value="">— Aucun —</option>
+                <option value="">- Aucun -</option>
                 <option v-for="d in store.availableDistrictsForRegulatorCenter" :key="d.code" :value="d.code">
                   {{ d.code }} – {{ d.name }}
                 </option>
