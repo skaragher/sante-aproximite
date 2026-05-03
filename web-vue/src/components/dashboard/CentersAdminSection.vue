@@ -201,7 +201,7 @@
           </div>
           <div class="ca-card-summary">
             <span class="ca-card-code">{{ center.establishmentCode || "–" }}</span>
-            <span class="ca-card-region">{{ center.regionCode || "–" }}</span>
+            <span class="ca-card-region">{{ regionLabel(center.regionCode) }}</span>
             <span class="ca-card-chevron">{{ isExpanded(center) ? "▲" : "▼" }}</span>
           </div>
         </div>
@@ -221,11 +221,11 @@
             </div>
             <div class="ca-detail-field">
               <span class="ca-detail-lbl">Région</span>
-              <span class="ca-detail-val">{{ center.regionCode || "–" }}</span>
+              <span class="ca-detail-val">{{ regionLabel(center.regionCode) }}</span>
             </div>
             <div class="ca-detail-field">
               <span class="ca-detail-lbl">District</span>
-              <span class="ca-detail-val">{{ center.districtCode || "–" }}</span>
+              <span class="ca-detail-val">{{ districtLabel(center.districtCode) }}</span>
             </div>
             <div class="ca-detail-field">
               <span class="ca-detail-lbl">Coordonnées GPS</span>
@@ -394,6 +394,18 @@ const showCenterModal = ref(false);
 
 const isExpanded = (center) => store.expandedCenterAdminId === String(center._id);
 const isEditing  = (center) => store.editingCenterAdminId  === String(center._id);
+
+function regionLabel(code) {
+  if (!code) return "–";
+  const match = (store.regions || []).find((r) => String(r.code || "").toUpperCase() === String(code).toUpperCase());
+  return match ? `${match.name} (${match.code})` : code;
+}
+
+function districtLabel(code) {
+  if (!code) return "–";
+  const match = (store.districts || []).find((d) => String(d.code || "").toUpperCase() === String(code).toUpperCase());
+  return match ? `${match.name} (${match.code})` : code;
+}
 
 async function submitNewCenter() {
   await store.createCenterByRegulator();

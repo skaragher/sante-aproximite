@@ -13,7 +13,26 @@
     <div v-if="localError" class="um-msg um-msg-err">{{ localError }}</div>
     <div v-if="localSuccess" class="um-msg um-msg-ok">{{ localSuccess }}</div>
 
-    <h3 class="um-heading">Liste des utilisateurs</h3>
+    <!-- ═══ Onglets ═══ -->
+    <div class="um-tabs">
+      <button
+        class="um-tab"
+        :class="{ 'um-tab--active': activeTab === 'professional' }"
+        @click="switchTab('professional')"
+      >
+        👔 Comptes professionnels
+        <span class="um-tab-count">{{ professionalUsers.length }}</span>
+      </button>
+      <button
+        v-if="canManagePublicAccounts"
+        class="um-tab"
+        :class="{ 'um-tab--active': activeTab === 'public' }"
+        @click="switchTab('public')"
+      >
+        👤 Comptes publics
+        <span class="um-tab-count">{{ publicUsers.length }}</span>
+      </button>
+    </div>
 
     <!-- ═══ Table ═══ -->
     <div class="um-table-wrap">
@@ -114,10 +133,10 @@
     </div>
 
     <!-- Pagination -->
-    <div v-if="store.usersPageCount > 1" class="um-pagination">
+    <div v-if="tabPageCount > 1" class="um-pagination">
       <button class="um-pg-btn" :disabled="store.usersPage <= 1" @click="store.usersPage--">‹</button>
-      <span class="um-pg-info">Page {{ store.usersPage }} / {{ store.usersPageCount }}</span>
-      <button class="um-pg-btn" :disabled="store.usersPage >= store.usersPageCount" @click="store.usersPage++">›</button>
+      <span class="um-pg-info">Page {{ store.usersPage }} / {{ tabPageCount }}</span>
+      <button class="um-pg-btn" :disabled="store.usersPage >= tabPageCount" @click="store.usersPage++">›</button>
     </div>
 
     <!-- ═══ Modal droits ═══ -->
@@ -237,16 +256,42 @@ const localSuccess = ref("");
 function showErr(msg) { localError.value = msg; setTimeout(() => { localError.value = ""; }, 4500); }
 function showOk(msg) { localSuccess.value = msg; setTimeout(() => { localSuccess.value = ""; }, 3000); }
 
+// ─── Onglets pro / public ─────────────────────────────────────────────────────
+const activeTab = ref("professional");
+
+const isPublicUser = (u) => {
+  const roles = Array.isArray(u.roles) ? u.roles : [u.role];
+  return roles.every((r) => !r || r === "USER" || r === "MANAGE_PUBLIC_USERS");
+};
+
+const professionalUsers = computed(() => store.users.filter((u) => !isPublicUser(u)));
+const publicUsers       = computed(() => store.users.filter((u) =>  isPublicUser(u)));
+
+function switchTab(tab) {
+  activeTab.value = tab;
+  store.usersPage = 1;
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 const localSearch = ref("");
 const displayedUsers = computed(() => {
   const q = localSearch.value.trim().toLowerCase();
-  const source = store.paginatedUsers || store.users;
-  if (!q) return source;
-  return store.users.filter((u) =>
-    String(u.fullName || "").toLowerCase().includes(q) ||
-    String(u.email || "").toLowerCase().includes(q)
-  );
+  const base = activeTab.value === "public" ? publicUsers.value : professionalUsers.value;
+  const source = q
+    ? base.filter((u) =>
+        String(u.fullName || "").toLowerCase().includes(q) ||
+        String(u.email || "").toLowerCase().includes(q)
+      )
+    : base;
+  // pagination manuelle sur la liste filtrée par onglet
+  const page = store.usersPage || 1;
+  const size = 20;
+  return source.slice((page - 1) * size, page * size);
+});
+
+const tabPageCount = computed(() => {
+  const base = activeTab.value === "public" ? publicUsers.value : professionalUsers.value;
+  return Math.max(1, Math.ceil(base.length / 20));
 });
 
 // ─── Role definitions ──────────────────────────────────────────────────────────
@@ -441,9 +486,12 @@ const filteredDistricts = computed(() => {
 
 function openCreate() {
   editTarget.value = null;
+  const defaultRole = activeTab.value === "public"
+    ? "USER"
+    : (visibleRoles.value.find((r) => r.value !== "USER")?.value || visibleRoles.value[0]?.value || "USER");
   Object.assign(editForm, {
     fullName: "", email: "", password: "",
-    role: visibleRoles.value[0]?.value || "USER",
+    role: defaultRole,
     regionCode: "", districtCode: "", centerId: "",
   });
   editMode.value = true;
@@ -548,6 +596,58 @@ onMounted(async () => {
 .um-msg { padding: 10px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; }
 .um-msg-err { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
 .um-msg-ok  { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+
+/* Tabs */
+.um-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 12px;
+}
+
+.um-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  margin-bottom: -2px;
+  border-radius: 6px 6px 0 0;
+  transition: color .15s, border-color .15s;
+}
+
+.um-tab:hover { color: #111827; background: #f9fafb; }
+
+.um-tab--active {
+  color: #1d4ed8;
+  border-bottom-color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.um-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.um-tab--active .um-tab-count {
+  background: #bfdbfe;
+  color: #1e40af;
+}
 
 .um-heading { font-size: 1rem; font-weight: 700; color: #111827; margin: 4px 0 0; }
 
