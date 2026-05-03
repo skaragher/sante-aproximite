@@ -1,7 +1,16 @@
 <template>
   <main class="dashboard">
+    <!-- Dashboard SAMU -->
+    <SamuSection
+      v-if="store.tab === 'overview' && isSamu"
+    />
+    <!-- Dashboard Sapeurs-Pompiers -->
+    <SapeurPompierSection
+      v-else-if="store.tab === 'overview' && isSapeurPompier"
+    />
+    <!-- Dashboard général (régulateurs, utilisateurs standards) -->
     <OverviewSection
-      v-if="store.tab === 'overview' && !store.isChef"
+      v-else-if="store.tab === 'overview' && !store.isChef"
     />
     <NearbySection
       v-show="store.tab === 'nearby' && !store.isChef"
@@ -28,7 +37,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useDashboardStore } from "../stores/dashboard";
 
@@ -39,7 +48,15 @@ import ImportsSection from "../components/dashboard/ImportsSection.vue";
 import MyCenterSection from "../components/dashboard/MyCenterSection.vue";
 import NearbySection from "../components/dashboard/NearbySection.vue";
 import OverviewSection from "../components/dashboard/OverviewSection.vue";
+import SamuSection from "../components/dashboard/SamuSection.vue";
+import SapeurPompierSection from "../components/dashboard/SapeurPompierSection.vue";
 import SettingsSection from "../components/dashboard/SettingsSection.vue";
+
+const normalizeRole = (v) => String(v || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+const isSamu = computed(() => store.authRoles.includes("SAMU"));
+const isSapeurPompier = computed(() =>
+  store.authRoles.some((r) => ["SAPEUR_POMPIER", "SAPEUR_POMPIER"].includes(r))
+);
 
 const route = useRoute();
 const store = useDashboardStore();
