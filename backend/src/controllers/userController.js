@@ -14,6 +14,13 @@ const ALLOWED_ADMIN_ROLES = new Set([
   "GENDARMERIE",
   "PROTECTION_CIVILE"
 ]);
+const SPECIAL_PERMISSIONS = new Set(["MANAGE_PUBLIC_USERS"]);
+const PRIMARY_ROLES = [...ALLOWED_ADMIN_ROLES];
+
+function normalizePermission(value) {
+  const normalized = typeof value === "string" ? value.trim().toUpperCase() : "";
+  return SPECIAL_PERMISSIONS.has(normalized) ? normalized : "";
+}
 
 function normalizeRole(role) {
   const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
@@ -25,8 +32,33 @@ function normalizeRole(role) {
 
 function normalizeRolesInput(rawRoles, fallbackRole = "USER") {
   const list = Array.isArray(rawRoles) ? rawRoles : [fallbackRole];
-  const normalized = [...new Set(list.map((role) => normalizeRole(role)).filter(Boolean))];
-  return normalized.length ? normalized : ["USER"];
+  const normalizedPrimaryRoles = [];
+  const normalizedPermissions = [];
+
+  for (const entry of list) {
+    const permission = normalizePermission(entry);
+    if (permission) {
+      normalizedPermissions.push(permission);
+      continue;
+    }
+    normalizedPrimaryRoles.push(normalizeRole(entry));
+  }
+
+  if (!normalizedPrimaryRoles.length) {
+    normalizedPrimaryRoles.push(normalizeRole(fallbackRole));
+  }
+
+  return [...new Set([...normalizedPrimaryRoles, ...normalizedPermissions].filter(Boolean))];
+}
+
+function extractPrimaryRole(roles, fallbackRole = "USER") {
+  const normalizedRoles = Array.isArray(roles) ? roles : [];
+  return normalizedRoles.find((entry) => PRIMARY_ROLES.includes(entry)) || normalizeRole(fallbackRole);
+}
+
+function hasManagePublicUsersPermission(userLike) {
+  const roles = Array.isArray(userLike?.roles) ? userLike.roles : [userLike?.role];
+  return roles.some((entry) => normalizePermission(entry) === "MANAGE_PUBLIC_USERS");
 }
 
 function mapUser(row) {
@@ -173,6 +205,7 @@ export async function listUsers(req, res) {
   const requesterRoles = Array.isArray(req.user?.roles)
     ? req.user.roles.map((r) => String(r || "").toUpperCase())
     : [String(req.user?.role || "").toUpperCase()];
+  const canManagePublicUsers = hasManagePublicUsersPermission(req.user);
 
   // Priorité de rôle la plus haute du requérant
   const ROLE_PRIORITY = [
@@ -196,27 +229,41 @@ export async function listUsers(req, res) {
     // Voit tous les utilisateurs (y compris les publics USER)
   } else if (effectiveRole === "REGULATOR") {
     // Voit tous les comptes admin (exclut les USER publics)
-    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
+    if (canManagePublicUsers) {
+      whereParts.push(`(u.role = ANY($${params.length + 1}::text[]) OR u.role = 'USER')`);
+    } else {
+      whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
+    }
     params.push(ADMIN_SCOPED_ROLES);
   } else if (effectiveRole === "REGION") {
     const regionCode = req.user?.regionCode || null;
-    if (!regionCode) return res.json([]);
-    whereParts.push(`upper(u.region_code) = $${params.length + 1}`);
-    params.push(regionCode);
-    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
-    params.push(ADMIN_SCOPED_ROLES);
+    if (!regionCode && !canManagePublicUsers) return res.json([]);
+    const regionScopedParts = [];
+    if (regionCode) {
+      regionScopedParts.push(`(upper(u.region_code) = $${params.length + 1} AND u.role = ANY($${params.length + 2}::text[]))`);
+      params.push(regionCode, ADMIN_SCOPED_ROLES);
+    }
+    if (canManagePublicUsers) {
+      regionScopedParts.push(`u.role = 'USER'`);
+    }
+    whereParts.push(`(${regionScopedParts.join(" OR ")})`);
   } else if (effectiveRole === "DISTRICT") {
     const districtCode = req.user?.districtCode || null;
-    if (!districtCode) return res.json([]);
-    whereParts.push(`upper(u.district_code) = $${params.length + 1}`);
-    params.push(districtCode);
-    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
-    params.push(ADMIN_SCOPED_ROLES);
+    if (!districtCode && !canManagePublicUsers) return res.json([]);
+    const districtScopedParts = [];
+    if (districtCode) {
+      districtScopedParts.push(`(upper(u.district_code) = $${params.length + 1} AND u.role = ANY($${params.length + 2}::text[]))`);
+      params.push(districtCode, ADMIN_SCOPED_ROLES);
+    }
+    if (canManagePublicUsers) {
+      districtScopedParts.push(`u.role = 'USER'`);
+    }
+    whereParts.push(`(${districtScopedParts.join(" OR ")})`);
   } else if (effectiveRole === "ETABLISSEMENT" || effectiveRole === "CHEF_ETABLISSEMENT") {
     // Voit les comptes admin liés à son centre ou son code établissement
     const centerId = req.user?.centerId || null;
     const estCode = req.user?.establishmentCode || null;
-    if (!centerId && !estCode) return res.json([]);
+    if (!centerId && !estCode && !canManagePublicUsers) return res.json([]);
     const orParts = [];
     if (centerId) {
       orParts.push(`u.center_id = $${params.length + 1}`);
@@ -226,18 +273,30 @@ export async function listUsers(req, res) {
       orParts.push(`upper(u.establishment_code) = $${params.length + 1}`);
       params.push(estCode);
     }
-    whereParts.push(`(${orParts.join(" OR ")})`);
-    whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
-    params.push(ADMIN_SCOPED_ROLES);
+    const etablissementScopedParts = [];
+    if (orParts.length) {
+      etablissementScopedParts.push(`((${orParts.join(" OR ")}) AND u.role = ANY($${params.length + 1}::text[]))`);
+      params.push(ADMIN_SCOPED_ROLES);
+    }
+    if (canManagePublicUsers) {
+      etablissementScopedParts.push(`u.role = 'USER'`);
+    }
+    whereParts.push(`(${etablissementScopedParts.join(" OR ")})`);
   } else if (effectiveRole === "SAMU" || effectiveRole === "SAPEUR_POMPIER") {
     // Voit les comptes de son propre service dans sa région
     const regionCode = req.user?.regionCode || null;
-    whereParts.push(`u.role = $${params.length + 1}`);
+    const emergencyScopedParts = [];
+    let emergencyClause = `u.role = $${params.length + 1}`;
     params.push(effectiveRole);
     if (regionCode) {
-      whereParts.push(`upper(u.region_code) = $${params.length + 1}`);
+      emergencyClause += ` AND upper(u.region_code) = $${params.length + 1}`;
       params.push(regionCode);
     }
+    emergencyScopedParts.push(`(${emergencyClause})`);
+    if (canManagePublicUsers) {
+      emergencyScopedParts.push(`u.role = 'USER'`);
+    }
+    whereParts.push(`(${emergencyScopedParts.join(" OR ")})`);
   } else {
     return res.json([]);
   }
@@ -295,7 +354,7 @@ export async function createUser(req, res) {
   }
 
   const normalizedRoles = normalizeRolesInput(roles, role);
-  const primaryRole = normalizedRoles[0];
+  const primaryRole = extractPrimaryRole(normalizedRoles, role);
 
   // Vérifier que le créateur a le droit de créer ce niveau de rôle
   const creatorRoles = Array.isArray(req.user?.roles)
@@ -305,10 +364,17 @@ export async function createUser(req, res) {
   const creatorLevel = ROLE_PRIORITY.find((r) => creatorRoles.includes(r)) || creatorRoles[0];
   const allowedToCreate = CREATABLE_ROLES_BY_LEVEL[creatorLevel];
   if (allowedToCreate !== null && allowedToCreate !== undefined) {
-    const forbidden = normalizedRoles.find((r) => !allowedToCreate.includes(r));
+    const forbidden = normalizedRoles.find(
+      (r) => PRIMARY_ROLES.includes(r) && !allowedToCreate.includes(r)
+    );
     if (forbidden) {
       return res.status(403).json({ message: `Vous n'avez pas le droit de créer un compte de type ${forbidden}` });
     }
+  }
+  if (normalizedRoles.includes("USER") && creatorLevel !== "NATIONAL" && !hasManagePublicUsersPermission(req.user)) {
+    return res.status(403).json({
+      message: "Vous devez disposer du droit de gestion des utilisateurs publics pour creer un compte USER."
+    });
   }
 
   let assignment;
@@ -409,7 +475,16 @@ export async function updateUser(req, res) {
 
   const current = currentResult.rows[0];
   const normalizedRoles = normalizeRolesInput(roles, role || current.role);
-  const primaryRole = normalizedRoles[0];
+  const primaryRole = extractPrimaryRole(normalizedRoles, role || current.role);
+  if (
+    normalizedRoles.includes("USER") &&
+    !hasManagePublicUsersPermission(req.user) &&
+    String(req.user?.role || "").toUpperCase() !== "NATIONAL"
+  ) {
+    return res.status(403).json({
+      message: "Vous devez disposer du droit de gestion des utilisateurs publics pour creer ou modifier un compte USER."
+    });
+  }
   const nextFullName = typeof fullName === "string" && fullName.trim() ? fullName.trim() : current.full_name;
   const nextEmail = typeof email === "string" && email.trim() ? email.toLowerCase().trim() : current.email;
   const nextEstablishmentCode = hasOwn(req.body, "establishmentCode")
