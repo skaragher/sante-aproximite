@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { apiFetch } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { C, R, S, shared } from "../theme";
@@ -31,6 +31,14 @@ function ApprovalBadge({ status }) {
 
 function normalizeGeoCode(value) { return String(value || "").trim().toUpperCase(); }
 
+function formatGeoOption(option) {
+  if (!option) return "";
+  const code = String(option.code || "").trim().toUpperCase();
+  const name = String(option.name || "").trim();
+  if (name && code) return `${name} (${code})`;
+  return name || code;
+}
+
 function parseServices(servicesCsv) {
   return String(servicesCsv || "").split(",").map((item) => item.trim()).filter(Boolean).map((name) => ({ name }));
 }
@@ -58,6 +66,8 @@ function toEditForm(center) {
 
 export function CenterSettingsScreen() {
   const { token, user } = useAuth();
+  const scrollRef = useRef(null);
+  const inputRefs = useRef({});
   const [loading, setLoading]             = useState(false);
   const [savingId, setSavingId]           = useState("");
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -82,6 +92,24 @@ export function CenterSettingsScreen() {
     [user]
   );
   const isAdminScope = normalizedRoles.some((role) => ["REGULATOR", "NATIONAL", "REGION", "DISTRICT"].includes(role));
+
+  function registerInputRef(key, ref) {
+    if (ref) inputRefs.current[key] = ref;
+  }
+
+  function scrollToField(key) {
+    const input = inputRefs.current[key];
+    const scroll = scrollRef.current;
+    if (!input || !scroll || typeof input.measureLayout !== "function") return;
+    const target = typeof scroll.getInnerViewNode === "function" ? scroll.getInnerViewNode() : scroll;
+    requestAnimationFrame(() => {
+      input.measureLayout(
+        target,
+        (_x, y) => scroll.scrollTo?.({ y: Math.max(0, y - 24), animated: true }),
+        () => {}
+      );
+    });
+  }
 
   async function loadRegions() {
     const data = await apiFetch("/geo/regions", { token });
@@ -195,7 +223,18 @@ export function CenterSettingsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 12}
+    >
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+    >
 
       {/* Header */}
       <View style={styles.header}>
@@ -215,6 +254,8 @@ export function CenterSettingsScreen() {
         <Text style={styles.sectionLabel}>RECHERCHE & FILTRES</Text>
 
         <TextInput
+          ref={(ref) => registerInputRef("search", ref)}
+          onFocus={() => scrollToField("search")}
           style={shared.input}
           placeholder="🔍 Recherche (nom, code, adresse)"
           value={search}
@@ -225,6 +266,8 @@ export function CenterSettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>Region</Text>
             <TextInput
+              ref={(ref) => registerInputRef("regionFilter", ref)}
+              onFocus={() => scrollToField("regionFilter")}
               style={shared.input}
               placeholder="Ex: ABIDJAN"
               autoCapitalize="characters"
@@ -235,6 +278,8 @@ export function CenterSettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>District</Text>
             <TextInput
+              ref={(ref) => registerInputRef("districtFilterBottom", ref)}
+              onFocus={() => scrollToField("districtFilterBottom")}
               style={shared.input}
               placeholder="Optionnel"
               autoCapitalize="characters"
@@ -253,23 +298,7 @@ export function CenterSettingsScreen() {
                 onPress={() => setRegionFilter(region.code)}
               >
                 <Text style={[styles.chipText, normalizeGeoCode(regionFilter) === region.code && styles.chipTextActive]}>
-                  {region.code}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-
-        {districts.length ? (
-          <View style={styles.chipGroup}>
-            {districts.map((district) => (
-              <Pressable
-                key={district.code}
-                style={[styles.chip, normalizeGeoCode(districtFilter) === district.code && styles.chipActive]}
-                onPress={() => setDistrictFilter(district.code)}
-              >
-                <Text style={[styles.chipText, normalizeGeoCode(districtFilter) === district.code && styles.chipTextActive]}>
-                  {district.code}
+                  {formatGeoOption(region)}
                 </Text>
               </Pressable>
             ))}
@@ -280,6 +309,42 @@ export function CenterSettingsScreen() {
           <Text style={styles.outlineBtnText}>{loading ? "Chargement..." : "Actualiser"}</Text>
         </Pressable>
       </View>
+
+      {String(regionFilter || "").trim() ? (
+        <View style={styles.filterCard}>
+          <Text style={styles.sectionLabel}>DISTRICTS DE LA REGION</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldLabel}>District</Text>
+            <TextInput
+              ref={(ref) => registerInputRef("districtFilterTop", ref)}
+              onFocus={() => scrollToField("districtFilterTop")}
+              style={shared.input}
+              placeholder="Optionnel"
+              autoCapitalize="characters"
+              value={districtFilter}
+              onChangeText={setDistrictFilter}
+            />
+          </View>
+
+          {districts.length ? (
+            <View style={styles.chipGroup}>
+              {districts.map((district) => (
+                <Pressable
+                  key={district.code}
+                  style={[styles.chip, normalizeGeoCode(districtFilter) === district.code && styles.chipActive]}
+                  onPress={() => setDistrictFilter(district.code)}
+                >
+                  <Text style={[styles.chipText, normalizeGeoCode(districtFilter) === district.code && styles.chipTextActive]}>
+                    {formatGeoOption(district)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>Aucun district charge pour cette region.</Text>
+          )}
+        </View>
+      ) : null}
 
       {message ? <Text style={[shared.success, styles.msgBox]}>{message}</Text> : null}
       {error   ? <Text style={[shared.error,   styles.msgBox]}>{error}</Text>   : null}
@@ -330,6 +395,8 @@ export function CenterSettingsScreen() {
                 ].map((field) => (
                   <TextInput
                     key={field.key}
+                    ref={(ref) => registerInputRef(`edit-${center._id}-${field.key}`, ref)}
+                    onFocus={() => scrollToField(`edit-${center._id}-${field.key}`)}
                     style={shared.input}
                     placeholder={field.placeholder}
                     autoCapitalize={field.autoCapitalize || "sentences"}
@@ -339,14 +406,14 @@ export function CenterSettingsScreen() {
                 ))}
 
                 <Text style={styles.fieldLabel}>Niveau: {LEVEL_OPTIONS.join(", ")}</Text>
-                <TextInput style={shared.input} placeholder="Niveau" value={editForm.level} onChangeText={(v) => setEditForm((p) => ({ ...p, level: v }))} />
+                <TextInput ref={(ref) => registerInputRef(`edit-${center._id}-level`, ref)} onFocus={() => scrollToField(`edit-${center._id}-level`)} style={shared.input} placeholder="Niveau" value={editForm.level} onChangeText={(v) => setEditForm((p) => ({ ...p, level: v }))} />
 
                 <Text style={styles.fieldLabel}>Type: {ESTABLISHMENT_TYPE_OPTIONS.join(", ")}</Text>
-                <TextInput style={shared.input} placeholder="Type" value={editForm.establishmentType} onChangeText={(v) => setEditForm((p) => ({ ...p, establishmentType: v }))} />
+                <TextInput ref={(ref) => registerInputRef(`edit-${center._id}-establishmentType`, ref)} onFocus={() => scrollToField(`edit-${center._id}-establishmentType`)} style={shared.input} placeholder="Type" value={editForm.establishmentType} onChangeText={(v) => setEditForm((p) => ({ ...p, establishmentType: v }))} />
 
                 <View style={styles.row}>
-                  <TextInput style={[shared.input, { flex: 1 }]} placeholder="Latitude"  keyboardType="numeric" value={editForm.latitude}  onChangeText={(v) => setEditForm((p) => ({ ...p, latitude: v }))} />
-                  <TextInput style={[shared.input, { flex: 1 }]} placeholder="Longitude" keyboardType="numeric" value={editForm.longitude} onChangeText={(v) => setEditForm((p) => ({ ...p, longitude: v }))} />
+                  <TextInput ref={(ref) => registerInputRef(`edit-${center._id}-latitude`, ref)} onFocus={() => scrollToField(`edit-${center._id}-latitude`)} style={[shared.input, { flex: 1 }]} placeholder="Latitude"  keyboardType="numeric" value={editForm.latitude}  onChangeText={(v) => setEditForm((p) => ({ ...p, latitude: v }))} />
+                  <TextInput ref={(ref) => registerInputRef(`edit-${center._id}-longitude`, ref)} onFocus={() => scrollToField(`edit-${center._id}-longitude`)} style={[shared.input, { flex: 1 }]} placeholder="Longitude" keyboardType="numeric" value={editForm.longitude} onChangeText={(v) => setEditForm((p) => ({ ...p, longitude: v }))} />
                 </View>
 
                 <View style={styles.row}>
@@ -392,6 +459,7 @@ export function CenterSettingsScreen() {
         );
       })}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

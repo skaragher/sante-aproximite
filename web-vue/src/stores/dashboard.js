@@ -2,9 +2,13 @@ import { computed, reactive, ref, watch } from "vue";
 import { apiFetch } from "../api/client";
 import { useAuthStore } from "./auth";
 
-// Singleton state — shared across all component instances (like a Pinia store)
+// Singleton state - shared across all component instances (like a Pinia store)
 const _store = (() => {
   const auth = useAuthStore();
+
+  // ─── Permission helpers ─────────────────────────────────────────────────────
+  const permissions = computed(() => new Set(Array.isArray(auth.state.user?.permissions) ? auth.state.user.permissions : []));
+  const hasPermission = (key) => permissions.value.has(key);
 
   // ─── Role helpers ───────────────────────────────────────────────────────────
   const normalizeRole = (value) =>
@@ -20,29 +24,36 @@ const _store = (() => {
     return [...new Set(combined)];
   });
 
+  const isDeveloper = computed(() => authRoles.value.includes("DEVELOPER"));
+
   const hasAnyRole = (values) =>
+    isDeveloper.value || values.some((v) => authRoles.value.includes(normalizeRole(v)));
+
+  const hasStrictRole = (values) =>
     values.some((v) => authRoles.value.includes(normalizeRole(v)));
 
   const isChef = computed(() =>
-    hasAnyRole(["ETABLISSEMENT", "CHEF_ETABLISSEMENT"])
+    hasStrictRole(["ETABLISSEMENT", "CHEF_ETABLISSEMENT"])
   );
   const isRegulator = computed(() =>
-    hasAnyRole(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"])
+    isDeveloper.value || hasStrictRole(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"])
   );
   const isEmergencyResponder = computed(() =>
-    hasAnyRole(["SAMU", "SAPEUR_POMPIER"])
+    hasStrictRole(["SAMU", "SAPEUR_POMPIER"])
+  );
+  const isSecurityResponder = computed(() =>
+    hasStrictRole(["POLICE", "GENDARMERIE", "PROTECTION_CIVILE"])
   );
   const canManageUsers = computed(() =>
-    hasAnyRole([
+    isDeveloper.value || hasAnyRole([
       "NATIONAL", "REGULATOR", "REGION", "DISTRICT",
-      "ETABLISSEMENT", "CHEF_ETABLISSEMENT", "SAMU", "SAPEUR_POMPIER"
+      "ETABLISSEMENT", "CHEF_ETABLISSEMENT", "SAMU", "SAPEUR_POMPIER",
+      "POLICE", "GENDARMERIE", "PROTECTION_CIVILE",
     ])
   );
-  // NATIONAL est un compte santé administratif pur — pas d'accès aux services opérationnels
-  // d'urgence (SAMU, Pompiers) ni aux forces de l'ordre (Police, Gendarmerie)
-  const isNational = computed(() => hasAnyRole(["NATIONAL"]));
+  const isNational = computed(() => hasStrictRole(["NATIONAL"]));
   const isHealthAdmin = computed(() =>
-    hasAnyRole(["NATIONAL", "REGULATOR", "REGION", "DISTRICT"])
+    isDeveloper.value || hasStrictRole(["NATIONAL", "REGULATOR", "REGION", "DISTRICT"])
   );
 
   // ─── Tab ────────────────────────────────────────────────────────────────────
@@ -50,6 +61,11 @@ const _store = (() => {
 
   function resolveTab(tabCandidate) {
     const requested = String(tabCandidate || "").trim();
+    // DEVELOPER accède à tous les onglets sans restriction
+    if (isDeveloper.value) {
+      const allTabs = ["overview", "nearby", "emergency-alerts", "security-alerts", "complaints", "evaluations", "my-center", "settings", "imports", "roles"];
+      return allTabs.includes(requested) ? requested : "overview";
+    }
     if (isChef.value) {
       if (requested === "evaluations" && hasApprovedChefCenter.value)
         return "evaluations";
@@ -59,12 +75,14 @@ const _store = (() => {
     }
     const allowed = ["overview", "nearby"];
     if (isEmergencyResponder.value) allowed.push("emergency-alerts");
+    if (isSecurityResponder.value) allowed.push("security-alerts");
     if (isRegulator.value)
       allowed.push("complaints", "evaluations", "settings", "imports", "roles");
     if (hasAnyRole(["NATIONAL", "REGULATOR"])) allowed.push("roles");
     if (canManageUsers.value) allowed.push("settings");
     if (allowed.includes(requested)) return requested;
     if (isEmergencyResponder.value) return "emergency-alerts";
+    if (isSecurityResponder.value) return "security-alerts";
     return "overview";
   }
 
@@ -252,6 +270,136 @@ const _store = (() => {
       .length,
     rejete: emergencyAlerts.value.filter((i) => i.status === "CLOSED").length,
   }));
+
+  // ─── Security Alerts ─────────────────────────────────────────────────────────
+  const securityAlerts = ref([]);
+  const securityAlertsError = ref("");
+  const securityAlertsSuccess = ref("");
+  const securityCategory = ref("ALL");
+  const securityCategoryMenu = [
+    { key: "ALL",        label: "Toutes" },
+    { key: "UNHANDLED",  label: "Non traite" },
+    { key: "IN_PROGRESS",label: "En cours" },
+    { key: "RESOLVED",   label: "Resolues" },
+    { key: "CLOSED",     label: "Cloturees" },
+  ];
+
+  const filteredSecurityAlerts = computed(() => {
+    if (securityCategory.value === "ALL")         return securityAlerts.value;
+    if (securityCategory.value === "UNHANDLED")   return securityAlerts.value.filter((a) => a.status === "NEW");
+    if (securityCategory.value === "IN_PROGRESS") return securityAlerts.value.filter((a) => a.status === "ACKNOWLEDGED");
+    if (securityCategory.value === "RESOLVED")    return securityAlerts.value.filter((a) => a.status === "RESOLVED");
+    if (securityCategory.value === "CLOSED")      return securityAlerts.value.filter((a) => a.status === "CLOSED");
+    return securityAlerts.value;
+  });
+
+  const securityAlertStats = computed(() => ({
+    nonTraite: securityAlerts.value.filter((a) => a.status === "NEW").length,
+    enCours:   securityAlerts.value.filter((a) => a.status === "ACKNOWLEDGED").length,
+    resolu:    securityAlerts.value.filter((a) => a.status === "RESOLVED").length,
+    cloture:   securityAlerts.value.filter((a) => a.status === "CLOSED").length,
+  }));
+
+  async function fetchSecurityAlerts() {
+    securityAlertsError.value = "";
+    securityAlertsSuccess.value = "";
+    try {
+      securityAlerts.value = await apiFetch("/security-alerts", { token: auth.state.token });
+    } catch (err) {
+      securityAlertsError.value = err.message;
+    }
+  }
+
+  async function takeSecurityAlertInCharge(item) {
+    securityAlertsError.value = "";
+    securityAlertsSuccess.value = "";
+    try {
+      await apiFetch(`/security-alerts/${item.id}`, {
+        token: auth.state.token,
+        method: "PATCH",
+        body: { status: "ACKNOWLEDGED" },
+      });
+      securityAlertsSuccess.value = "Alerte prise en compte";
+      await fetchSecurityAlerts();
+    } catch (err) {
+      securityAlertsError.value = err.message;
+    }
+  }
+
+  async function resolveSecurityAlert(item) {
+    securityAlertsError.value = "";
+    securityAlertsSuccess.value = "";
+    try {
+      await apiFetch(`/security-alerts/${item.id}`, {
+        token: auth.state.token,
+        method: "PATCH",
+        body: { status: "RESOLVED" },
+      });
+      securityAlertsSuccess.value = "Alerte resolue";
+      await fetchSecurityAlerts();
+    } catch (err) {
+      securityAlertsError.value = err.message;
+    }
+  }
+
+  async function closeSecurityAlert(item) {
+    securityAlertsError.value = "";
+    securityAlertsSuccess.value = "";
+    try {
+      await apiFetch(`/security-alerts/${item.id}`, {
+        token: auth.state.token,
+        method: "PATCH",
+        body: { status: "CLOSED" },
+      });
+      securityAlertsSuccess.value = "Alerte cloturee";
+      await fetchSecurityAlerts();
+    } catch (err) {
+      securityAlertsError.value = err.message;
+    }
+  }
+
+  function formatSecurityAlertType(type) {
+    const map = { AGRESSION: "Agression", ACCIDENT: "Accident", INCENDIE: "Incendie", INTRUSION: "Intrusion", AUTRE: "Autre" };
+    return map[String(type || "").toUpperCase()] || type || "-";
+  }
+
+  function formatSecurityStatus(status) {
+    const map = { NEW: "Nouveau", ACKNOWLEDGED: "Pris en charge", RESOLVED: "Resolu", CLOSED: "Cloture" };
+    return map[String(status || "").toUpperCase()] || status || "-";
+  }
+
+  function getSecurityStatusClass(status) {
+    const s = String(status || "").toUpperCase();
+    if (s === "NEW")          return "badge-new";
+    if (s === "ACKNOWLEDGED") return "badge-in-progress";
+    if (s === "RESOLVED")     return "badge-success";
+    if (s === "CLOSED")       return "badge-closed";
+    return "";
+  }
+
+  function getSecurityAlertCardClass(status) {
+    const s = String(status || "").toUpperCase();
+    if (s === "NEW")          return "card-new";
+    if (s === "ACKNOWLEDGED") return "card-in-progress";
+    if (s === "RESOLVED")     return "card-resolved";
+    if (s === "CLOSED")       return "card-closed";
+    return "";
+  }
+
+  function navigateToSecurityAlert(item) {
+    const lat = Number(item?.latitude);
+    const lon = Number(item?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      securityAlertsError.value = "Coordonnees invalides pour cette alerte.";
+      return;
+    }
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`, "_blank");
+  }
+
+  function buildSecurityMapEmbedUrl(lat, lon) {
+    if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))) return "";
+    return `https://maps.google.com/maps?q=${lat},${lon}&z=15&output=embed`;
+  }
 
   // ─── Chef center ─────────────────────────────────────────────────────────────
   const myCenterId = ref("");
@@ -538,6 +686,89 @@ const _store = (() => {
       .slice()
       .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
   });
+
+  // ─── RBAC ────────────────────────────────────────────────────────────────────
+  const rbacRoles = ref([]);
+  const rbacPermissions = ref([]);
+  const rbacError = ref("");
+  const rbacSuccess = ref("");
+
+  async function fetchRbacRoles() {
+    rbacError.value = "";
+    try {
+      rbacRoles.value = await apiFetch("/rbac/roles", { token: auth.state.token });
+    } catch (err) {
+      rbacError.value = err.message;
+    }
+  }
+
+  async function fetchRbacPermissions() {
+    try {
+      rbacPermissions.value = await apiFetch("/rbac/permissions", { token: auth.state.token });
+    } catch {
+      // silent
+    }
+  }
+
+  async function createRbacRole(name, description, perms) {
+    rbacError.value = "";
+    rbacSuccess.value = "";
+    try {
+      await apiFetch("/rbac/roles", {
+        token: auth.state.token,
+        method: "POST",
+        body: { name, description, permissions: perms },
+      });
+      rbacSuccess.value = "Rôle créé";
+      await fetchRbacRoles();
+    } catch (err) {
+      rbacError.value = err.message;
+    }
+  }
+
+  async function updateRbacRole(id, name, description, perms) {
+    rbacError.value = "";
+    rbacSuccess.value = "";
+    try {
+      await apiFetch(`/rbac/roles/${id}`, {
+        token: auth.state.token,
+        method: "PUT",
+        body: { name, description, permissions: perms },
+      });
+      rbacSuccess.value = "Rôle mis à jour";
+      await fetchRbacRoles();
+    } catch (err) {
+      rbacError.value = err.message;
+    }
+  }
+
+  async function deleteRbacRole(id) {
+    rbacError.value = "";
+    rbacSuccess.value = "";
+    try {
+      await apiFetch(`/rbac/roles/${id}`, { token: auth.state.token, method: "DELETE" });
+      rbacSuccess.value = "Rôle supprimé";
+      await fetchRbacRoles();
+    } catch (err) {
+      rbacError.value = err.message;
+    }
+  }
+
+  async function assignRbacUsers(roleId, userIds) {
+    rbacError.value = "";
+    rbacSuccess.value = "";
+    try {
+      await apiFetch(`/rbac/roles/${roleId}/users`, {
+        token: auth.state.token,
+        method: "PUT",
+        body: { userIds },
+      });
+      rbacSuccess.value = "Utilisateurs assignés";
+      await fetchRbacRoles();
+    } catch (err) {
+      rbacError.value = err.message;
+    }
+  }
 
   // ─── Imports ─────────────────────────────────────────────────────────────────
   let XLSXModule = null;
@@ -1971,8 +2202,10 @@ const _store = (() => {
   );
 
   return reactive({
+    // permissions
+    permissions, hasPermission,
     // roles
-    authRoles, isChef, isRegulator, isEmergencyResponder, canManageUsers, isNational, isHealthAdmin,
+    authRoles, isDeveloper, isChef, isRegulator, isEmergencyResponder, isSecurityResponder, canManageUsers, isNational, isHealthAdmin,
     hasAnyRole, hasApprovedChefCenter, canSeeComplaintsPanel, canHandleComplaintActions,
     // tab
     tab, resolveTab,
@@ -1997,6 +2230,12 @@ const _store = (() => {
     openUnhandledEmergencyAlerts, takeEmergencyInCharge, setEmergencyProgress, navigateToEmergency,
     buildEmergencyMapEmbedUrl, getEmergencyStatusClass, getEmergencyAlertCardClass,
     getEmergencyCountry, getEmergencyPlaceName, getEmergencyCity, getEmergencyLocality,
+    // security alerts
+    securityAlerts, securityAlertsError, securityAlertsSuccess, securityCategory, securityCategoryMenu,
+    filteredSecurityAlerts, securityAlertStats,
+    fetchSecurityAlerts, takeSecurityAlertInCharge, resolveSecurityAlert, closeSecurityAlert,
+    formatSecurityAlertType, formatSecurityStatus, getSecurityStatusClass, getSecurityAlertCardClass,
+    navigateToSecurityAlert, buildSecurityMapEmbedUrl,
     // chef
     myCenterId, chefForm, chefError, chefSuccess,
     setCurrentPosition, saveMyCenter, loadChefCenterFromList,
@@ -2044,6 +2283,9 @@ const _store = (() => {
     getCurrentPositionDetailed,
     // normalize
     normalizeGeoCode,
+    // rbac
+    rbacRoles, rbacPermissions, rbacError, rbacSuccess,
+    fetchRbacRoles, fetchRbacPermissions, createRbacRole, updateRbacRole, deleteRbacRole, assignRbacUsers,
   });
 })();
 

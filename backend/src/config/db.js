@@ -53,7 +53,8 @@ async function runMigrations() {
           'CHEF_ETABLISSEMENT',
           'POLICE',
           'GENDARMERIE',
-          'PROTECTION_CIVILE'
+          'PROTECTION_CIVILE',
+          'MANAGE_PUBLIC_USERS'
         )
       ),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -215,7 +216,8 @@ async function runMigrations() {
         'CHEF_ETABLISSEMENT',
         'POLICE',
         'GENDARMERIE',
-        'PROTECTION_CIVILE'
+        'PROTECTION_CIVILE',
+        'DEVELOPER'
       )
     );
   `);
@@ -791,7 +793,8 @@ async function runMigrations() {
       role IN (
         'USER','REGULATOR','NATIONAL','REGION','DISTRICT',
         'ETABLISSEMENT','SAPEUR_POMPIER','SAMU',
-        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE'
+        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE',
+        'DEVELOPER','MANAGE_PUBLIC_USERS'
       )
     );
   `);
@@ -803,7 +806,7 @@ async function runMigrations() {
       role IN (
         'USER','REGULATOR','NATIONAL','REGION','DISTRICT',
         'ETABLISSEMENT','SAPEUR_POMPIER','SAMU',
-        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE'
+        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE','DEVELOPER'
       )
     );
   `);
@@ -826,6 +829,39 @@ async function runMigrations() {
         'SAMU','SAPEUR_POMPIER','POLICE','GENDARMERIE','PROTECTION_CIVILE'
       )
     );
+  `);
+
+  // Étendre les contraintes pour inclure le rôle DEVELOPER
+  await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;`);
+  await pool.query(`
+    ALTER TABLE users
+    ADD CONSTRAINT users_role_check CHECK (
+      role IN (
+        'USER','REGULATOR','NATIONAL','REGION','DISTRICT',
+        'ETABLISSEMENT','SAPEUR_POMPIER','SAMU',
+        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE','DEVELOPER'
+      )
+    );
+  `);
+
+  await pool.query(`ALTER TABLE user_roles DROP CONSTRAINT IF EXISTS user_roles_role_check;`);
+  await pool.query(`
+    ALTER TABLE user_roles
+    ADD CONSTRAINT user_roles_role_check CHECK (
+      role IN (
+        'USER','REGULATOR','NATIONAL','REGION','DISTRICT',
+        'ETABLISSEMENT','SAPEUR_POMPIER','SAMU',
+        'CHEF_ETABLISSEMENT','POLICE','GENDARMERIE','PROTECTION_CIVILE','DEVELOPER'
+      )
+    );
+  `);
+
+  // Attribuer le rôle DEVELOPER au compte développeur principal
+  await pool.query(`UPDATE users SET role = 'DEVELOPER' WHERE email = 'skaragher@gmail.com';`);
+  await pool.query(`
+    INSERT INTO user_roles (user_id, role)
+    SELECT id, 'DEVELOPER' FROM users WHERE email = 'skaragher@gmail.com'
+    ON CONFLICT (user_id, role) DO NOTHING;
   `);
 }
 

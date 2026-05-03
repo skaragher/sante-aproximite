@@ -40,10 +40,10 @@
         type="button"
         class="ghost settings-switch-btn"
         :class="{ active: store.settingsSection === 'centers' }"
-        @click="store.settingsSection = 'centers'"
+        @click="switchToCenters"
       >
         Gestion des centres
-        <span class="settings-badge">{{ store.pendingCenters.length }}</span>
+        <span class="settings-badge">{{ store.allCenters.length }}</span>
       </button>
       <button
         v-if="canSeeCentersTab"
@@ -305,7 +305,12 @@
       </article>
     </div>
 
-    <!-- ── CENTERS ── -->
+    <!-- ── GESTION DES CENTRES ── -->
+    <div v-else-if="store.settingsSection === 'centers'">
+      <CentersAdminSection />
+    </div>
+
+    <!-- ── CENTRES EN ATTENTE ── -->
     <div v-else-if="store.settingsSection === 'pending-centers' && canSeeCentersTab" class="settings-grid settings-centers-layout">
       <article class="card settings-card settings-card-span-2">
         <div class="settings-table-header">
@@ -357,210 +362,6 @@
       </article>
     </div>
 
-    <div v-else-if="canSeeCentersTab" class="settings-grid settings-centers-layout">
-      <article class="card settings-card">
-        <h3 class="settings-card-title">Regions et districts</h3>
-        <p class="muted settings-card-subtitle">
-          Maintenez a jour la structure territoriale officielle.
-        </p>
-        <form class="form-grid" @submit.prevent="store.createRegion">
-          <strong>Creer une region</strong>
-          <div class="grid2">
-            <input v-model="store.regionForm.code" placeholder="Code region (ex: ABIDJAN)" required />
-            <input v-model="store.regionForm.name" placeholder="Nom region" required />
-          </div>
-          <button type="submit">Creer la region</button>
-        </form>
-        <form class="form-grid" @submit.prevent="store.createDistrict">
-          <strong>Creer un district lie a une region</strong>
-          <select v-model="store.districtForm.regionCode" required>
-            <option value="">Selectionner une region</option>
-            <option
-              v-for="region in store.regions"
-              :key="region.code"
-              :value="region.code"
-            >
-              {{ region.code }} - {{ region.name }}
-            </option>
-          </select>
-          <div class="grid2">
-            <input v-model="store.districtForm.code" placeholder="Code district" required />
-            <input v-model="store.districtForm.name" placeholder="Nom district" required />
-          </div>
-          <button type="submit">Creer le district</button>
-        </form>
-        <p v-if="store.geoError" class="error">{{ store.geoError }}</p>
-        <p v-if="store.geoSuccess" class="success">{{ store.geoSuccess }}</p>
-      </article>
-
-      <article class="card settings-card">
-        <h3 class="settings-card-title">Creation d'un etablissement</h3>
-        <p class="muted settings-card-subtitle">
-          Creez un etablissement avec sa region, son district et ses coordonnees GPS.
-        </p>
-        <form class="form-grid" @submit.prevent="store.createCenterByRegulator">
-          <input
-            v-model="store.regulatorCenterForm.name"
-            placeholder="Nom de l'etablissement"
-            required
-          />
-          <input
-            v-model="store.regulatorCenterForm.address"
-            placeholder="Adresse"
-            required
-          />
-          <input
-            v-model="store.regulatorCenterForm.establishmentCode"
-            placeholder="Code etablissement (optionnel)"
-          />
-          <select v-model="store.regulatorCenterForm.level" required>
-            <option value="CHU">CHU</option>
-            <option value="CHR">CHR</option>
-            <option value="CH">CH</option>
-            <option value="CHS">CHS</option>
-            <option value="CLINIQUE_PRIVEE">Clinique privee</option>
-            <option value="CLCC">CLCC</option>
-            <option value="ESPC">ESPC</option>
-            <option value="CENTRE_SANTE">Centre de sante</option>
-            <option value="SSR">SSR</option>
-            <option value="EHPAD_USLD">EHPAD / USLD</option>
-            <option value="CENTRE_RADIOTHERAPIE">Centre de radiotherapie</option>
-            <option value="CENTRE_CARDIOLOGIE">Centre de cardiologie</option>
-          </select>
-          <select v-model="store.regulatorCenterForm.establishmentType" required>
-            <option value="CONFESSIONNEL">Confessionnel</option>
-            <option value="PRIVE">Prive</option>
-            <option value="PUBLIQUE">Publique</option>
-          </select>
-          <select
-            v-model="store.regulatorCenterForm.regionCode"
-            required
-            @change="store.onRegulatorRegionChange"
-          >
-            <option value="">Selectionner une region</option>
-            <option
-              v-for="region in store.regions"
-              :key="region.code"
-              :value="region.code"
-            >
-              {{ region.code }} - {{ region.name }}
-            </option>
-          </select>
-          <select v-model="store.regulatorCenterForm.districtCode">
-            <option value="">District (optionnel)</option>
-            <option
-              v-for="district in store.availableDistrictsForRegulatorCenter"
-              :key="district.code"
-              :value="district.code"
-            >
-              {{ district.code }} - {{ district.name }}
-            </option>
-          </select>
-          <textarea
-            v-model="store.regulatorCenterForm.technicalPlatform"
-            placeholder="Plateau technique"
-            required
-          />
-          <input
-            v-model="store.regulatorCenterForm.servicesCsv"
-            placeholder="Services (Urgences, Radiologie)"
-          />
-          <div class="grid2">
-            <input
-              v-model.number="store.regulatorCenterForm.latitude"
-              type="number"
-              step="any"
-              placeholder="Latitude GPS"
-              required
-            />
-            <input
-              v-model.number="store.regulatorCenterForm.longitude"
-              type="number"
-              step="any"
-              placeholder="Longitude GPS"
-              required
-            />
-          </div>
-          <div class="actions">
-            <button type="button" class="secondary" @click="store.setRegulatorCurrentPosition">
-              Utiliser ma position GPS
-            </button>
-            <button type="submit">Creer l'etablissement</button>
-          </div>
-        </form>
-        <p v-if="store.regulatorCenterError" class="error">{{ store.regulatorCenterError }}</p>
-        <p v-if="store.regulatorCenterSuccess" class="success">{{ store.regulatorCenterSuccess }}</p>
-      </article>
-
-      <article class="card settings-card settings-card-span-2">
-        <h3 class="settings-card-title">Validation des centres en attente</h3>
-        <p class="muted settings-card-subtitle">
-          Approuvez ou rejetez les etablissements en attente de validation.
-        </p>
-        <div class="actions">
-          <input
-            v-model="store.pendingCenterSearch"
-            placeholder="Rechercher un centre (nom/code)"
-          />
-          <button type="button" class="secondary" @click="store.fetchPendingCenters">
-            Actualiser
-          </button>
-          <button
-            type="button"
-            @click="store.approveAllPendingCenters"
-            :disabled="store.filteredPendingCenters.length === 0"
-          >
-            Approuver tous
-          </button>
-        </div>
-        <div class="card-list">
-          <article
-            v-for="center in store.paginatedPendingCenters"
-            :key="center._id"
-            class="card"
-          >
-            <h4>{{ center.name }}</h4>
-            <p><strong>Code:</strong> {{ center.establishmentCode || "-" }}</p>
-            <p><strong>Niveau:</strong> {{ store.formatLevel(center.level) }}</p>
-            <p><strong>Type:</strong> {{ store.formatType(center.establishmentType) }}</p>
-            <p><strong>Region:</strong> {{ center.regionCode || "-" }}</p>
-            <p><strong>District:</strong> {{ center.districtCode || "-" }}</p>
-            <p><strong>Statut:</strong> {{ center.approvalStatus }}</p>
-            <div class="actions">
-              <button @click="store.reviewCenter(center._id, 'APPROVE')">Approuver</button>
-              <button
-                class="ghost danger"
-                @click="store.reviewCenter(center._id, 'REJECT')"
-              >
-                Rejeter
-              </button>
-            </div>
-          </article>
-          <p v-if="store.filteredPendingCenters.length === 0" class="muted">
-            Aucun centre en attente.
-          </p>
-        </div>
-        <div v-if="store.pendingCentersPageCount > 1" class="actions">
-          <button
-            class="ghost"
-            :disabled="store.pendingCentersPage <= 1"
-            @click="store.pendingCentersPage = Math.max(1, store.pendingCentersPage - 1)"
-          >
-            Precedent
-          </button>
-          <span class="muted">
-            Page {{ store.pendingCentersPage }} / {{ store.pendingCentersPageCount }}
-          </span>
-          <button
-            class="ghost"
-            :disabled="store.pendingCentersPage >= store.pendingCentersPageCount"
-            @click="store.pendingCentersPage = Math.min(store.pendingCentersPageCount, store.pendingCentersPage + 1)"
-          >
-            Suivant
-          </button>
-        </div>
-      </article>
-    </div>
   </section>
 </template>
 
@@ -568,6 +369,7 @@
 import { computed } from "vue";
 import { useDashboardStore } from "../../stores/dashboard";
 import UsersMgmtSection from "./UsersMgmtSection.vue";
+import CentersAdminSection from "./CentersAdminSection.vue";
 
 const store = useDashboardStore();
 const canSeeCentersTab = computed(() => store.isRegulator);
@@ -588,6 +390,13 @@ function formatDistrictLabel(districtCode) {
 
 function openPendingCentersOverview() {
   store.settingsSection = "pending-centers";
+}
+
+async function switchToCenters() {
+  store.settingsSection = "centers";
+  if (store.allCenters.length === 0) await store.fetchAllCenters();
+  if (store.regions.length === 0) await store.fetchRegions();
+  if (store.districts.length === 0) await store.fetchDistricts();
 }
 
 const pendingCentersByRegion = computed(() => {

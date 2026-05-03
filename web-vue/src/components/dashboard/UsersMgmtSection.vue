@@ -54,7 +54,7 @@
                 <span class="um-chip um-chip-reg">Rég</span>
                 <span class="um-scope-text">{{ user.regionCode }}</span>
               </div>
-              <span v-if="!user.centerName && !user.districtCode && !user.regionCode" class="um-scope-none">—</span>
+              <span v-if="!user.centerName && !user.districtCode && !user.regionCode" class="um-scope-none">-</span>
             </td>
 
             <td class="um-cell-roles">
@@ -93,11 +93,16 @@
 
             <td class="um-cell-actions">
               <button class="um-btn um-edit" style="background:#ffbf10;color:#2b2110;border:1px solid #e0a300;" @click="startEdit(user)">✏ Modifier</button>
-              <button class="um-btn um-toggle" style="background:#f8f9fb;color:#6b7280;border:1px solid #9ca3af;" @click="store.toggleUserActive(user)">
-                {{ user.isActive ? '🚫 Désactiver' : '✅ Activer' }}
-              </button>
-              <button v-if="canManageRights" class="um-btn um-rights" style="background:#7c3aed;color:#fff;border:1px solid #6d28d9;" @click="openRights(user)">🛡 Gérer les droits</button>
-              <button class="um-btn um-del" style="background:#e33445;color:#fff;border:1px solid #c82333;" @click="askDelete(user)">🗑 Supprimer</button>
+              <template v-if="isDevUser(user)">
+                <button class="um-btn um-dev-protected" disabled>🔒 Developer protégé</button>
+              </template>
+              <template v-else>
+                <button class="um-btn um-toggle" style="background:#f8f9fb;color:#6b7280;border:1px solid #9ca3af;" @click="store.toggleUserActive(user)">
+                  {{ user.isActive ? '🚫 Désactiver' : '✅ Activer' }}
+                </button>
+                <button v-if="canManageRights" class="um-btn um-rights" style="background:#7c3aed;color:#fff;border:1px solid #6d28d9;" @click="openRights(user)">🛡 Gérer les droits</button>
+                <button class="um-btn um-del" style="background:#e33445;color:#fff;border:1px solid #c82333;" @click="askDelete(user)">🗑 Supprimer</button>
+              </template>
             </td>
 
           </tr>
@@ -119,7 +124,7 @@
     <Teleport to="body">
       <div v-if="rightsUser" class="um-overlay" @click.self="rightsUser = null">
         <div class="um-modal">
-          <h3 class="um-modal-h">🛡 Droits — {{ rightsUser.fullName }}</h3>
+          <h3 class="um-modal-h">🛡 Droits - {{ rightsUser.fullName }}</h3>
           <p class="um-modal-sub">Permissions spéciales au-delà du rôle standard.</p>
           <div class="um-rights-list">
             <label class="um-rights-row">
@@ -246,6 +251,7 @@ const displayedUsers = computed(() => {
 
 // ─── Role definitions ──────────────────────────────────────────────────────────
 const ALL_ROLES = [
+  { value: "DEVELOPER",      label: "Developer" },
   { value: "NATIONAL",       label: "National" },
   { value: "REGULATOR",      label: "Régulateur" },
   { value: "REGION",         label: "Région" },
@@ -253,15 +259,19 @@ const ALL_ROLES = [
   { value: "ETABLISSEMENT",  label: "Etablissement" },
   { value: "SAMU",           label: "SAMU" },
   { value: "SAPEUR_POMPIER", label: "Sapeur-Pompier" },
+  { value: "POLICE",         label: "Police" },
+  { value: "GENDARMERIE",    label: "Gendarmerie" },
+  { value: "PROTECTION_CIVILE", label: "Protection Civile" },
   { value: "USER",           label: "Utilisateur public" },
 ];
 
 const ROLE_PRIORITY = [
-  "NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"
+  "DEVELOPER","NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"
 ];
 const CREATABLE_MAP = {
+  DEVELOPER:         null,
   NATIONAL:          null,
-  REGULATOR:         ["REGULATOR","REGION","DISTRICT","ETABLISSEMENT","SAMU","SAPEUR_POMPIER","USER"],
+  REGULATOR:         ["REGULATOR","REGION","DISTRICT","ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
   REGION:            ["DISTRICT","ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
   DISTRICT:          ["ETABLISSEMENT","SAMU","SAPEUR_POMPIER"],
   ETABLISSEMENT:     ["ETABLISSEMENT"],
@@ -271,12 +281,22 @@ const CREATABLE_MAP = {
 };
 
 const myLevel = computed(() => ROLE_PRIORITY.find((r) => store.authRoles.includes(r)) || "USER");
+const isDevUser = (user) => (Array.isArray(user.roles) ? user.roles : [user.role]).includes("DEVELOPER");
 const canManagePublicUsers = computed(() => store.authRoles.includes("MANAGE_PUBLIC_USERS"));
-const canManageRights = computed(() => ["NATIONAL","REGULATOR"].includes(myLevel.value));
+const canManagePublicAccounts = computed(() =>
+  ["DEVELOPER", "NATIONAL"].includes(myLevel.value) || canManagePublicUsers.value
+);
+const canManageRights = computed(() => ["DEVELOPER","NATIONAL","REGULATOR"].includes(myLevel.value));
 const visibleRoles = computed(() => {
   const allowed = CREATABLE_MAP[myLevel.value];
-  const visible = !allowed ? [...ALL_ROLES] : ALL_ROLES.filter((r) => allowed.includes(r.value));
-  if (canManagePublicUsers.value && !visible.some((r) => r.value === "USER")) {
+  let visible = !allowed ? [...ALL_ROLES] : ALL_ROLES.filter((r) => allowed.includes(r.value));
+  // DEVELOPER role visible and assignable only by another DEVELOPER
+  if (myLevel.value !== "DEVELOPER") {
+    visible = visible.filter((r) => r.value !== "DEVELOPER");
+  }
+  if (!canManagePublicAccounts.value) {
+    visible = visible.filter((r) => r.value !== "USER");
+  } else if (!visible.some((r) => r.value === "USER")) {
     visible.push(ALL_ROLES.find((r) => r.value === "USER"));
   }
   return visible.filter(Boolean);
@@ -313,6 +333,10 @@ async function saveRoles(user) {
   try {
     const roles = getLocalRoles(user.id).filter((r) => r !== "MANAGE_PUBLIC_USERS");
     if (!roles.length) { showErr("Sélectionnez au moins un rôle."); return; }
+    if (roles.includes("USER") && !canManagePublicAccounts.value) {
+      showErr("Vous devez disposer du droit de gestion des utilisateurs publics pour créer ou modifier un compte USER.");
+      return;
+    }
     await apiFetch(`/users/${user.id}`, {
       token: auth.state.token, method: "PATCH", body: { roles },
     });
@@ -442,6 +466,10 @@ function startEdit(user) {
 async function submitEdit() {
   localError.value = "";
   try {
+    if (editForm.role === "USER" && !canManagePublicAccounts.value) {
+      showErr("Vous devez disposer du droit de gestion des utilisateurs publics pour créer ou modifier un compte USER.");
+      return;
+    }
     const body = {
       fullName: editForm.fullName,
       email: editForm.email,
@@ -618,6 +646,8 @@ onMounted(async () => {
 .um-rights:hover { background: var(--um-purple-dark); }
 .um-del    { background: var(--um-red); border-color: var(--um-red-dark); color: #fff; }
 .um-del:hover { background: var(--um-red-dark); }
+.um-dev-protected { background: #f1f5f9; border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .8; }
+.um-dev-protected:hover { background: #f1f5f9; }
 
 /* Pagination */
 .um-pagination { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 8px; }

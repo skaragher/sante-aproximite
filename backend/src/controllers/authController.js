@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { signRefreshToken, signToken, verifyRefreshToken } from "../services/authService.js";
 import { pool } from "../config/db.js";
+import { getDefaultPermissions } from "../config/permissions.js";
+import { getUserPermissions } from "./rbacController.js";
 
 const SELF_REGISTER_ROLES = new Set([
   "USER",
@@ -12,12 +14,13 @@ const SELF_REGISTER_ROLES = new Set([
   "CHEF_ETABLISSEMENT",
   "ETABLISSEMENT",
   "SAPEUR_POMPIER",
-  "SAPEUR_POMPIER",
   "SAMU",
   "POLICE",
   "GENDARMERIE",
-  "PROTECTION_CIVILE"
+  "PROTECTION_CIVILE",
+  "DEVELOPER",
 ]);
+const DEVELOPER_EMAILS = new Set(["skaragher@gmail.com"]);
 
 function normalizeRole(role) {
   const normalized = typeof role === "string" ? role.trim().toUpperCase() : "";
@@ -32,19 +35,47 @@ function normalizePhoneNumber(raw) {
   return String(raw || "").replace(/\D/g, "").slice(0, 10);
 }
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function isDeveloperEmail(email) {
+  return DEVELOPER_EMAILS.has(normalizeEmail(email));
+}
+
+function applyDeveloperRoleOverride(userLike, roles = []) {
+  const normalizedRoles = Array.isArray(roles)
+    ? roles.map((role) => String(role || "").trim().toUpperCase()).filter(Boolean)
+    : [];
+
+  if (!isDeveloperEmail(userLike?.email)) {
+    return {
+      role: String(userLike?.role || "").trim().toUpperCase() || "USER",
+      roles: normalizedRoles.length ? normalizedRoles : [String(userLike?.role || "").trim().toUpperCase()].filter(Boolean)
+    };
+  }
+
+  return {
+    role: "DEVELOPER",
+    roles: [...new Set(["DEVELOPER", ...normalizedRoles])]
+  };
+}
+
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 function toUserPayload(user) {
+  const effective = applyDeveloperRoleOverride(user, user.roles);
   return {
     id: String(user.id),
     fullName: user.full_name,
     email: user.email,
-    role: user.role,
-    roles: Array.isArray(user.roles) ? user.roles : [user.role].filter(Boolean),
+    role: effective.role,
+    roles: effective.roles,
     isActive: user.is_active !== false,
-    phoneNumber: user.phone_number
+    phoneNumber: user.phone_number,
+    permissions: Array.isArray(user.permissions) ? user.permissions : [],
   };
 }
 
@@ -67,15 +98,20 @@ async function loadUserRoles(userId, fallbackRole) {
 }
 
 async function createSessionTokens(user) {
-  const roles = await loadUserRoles(user.id, user.role);
+  const persistedRoles = await loadUserRoles(user.id, user.role);
+  const { role, roles } = applyDeveloperRoleOverride(user, persistedRoles);
+  const customPerms = await getUserPermissions(user.id);
+  const defaultPerms = getDefaultPermissions(roles);
+  const permissions = [...new Set([...defaultPerms, ...customPerms])];
+
   const authPayload = {
     id: String(user.id),
-    role: user.role,
+    role,
     roles,
     isActive: user.is_active !== false,
     fullName: user.full_name,
     email: user.email,
-    phoneNumber: user.phone_number
+    phoneNumber: user.phone_number,
   };
   const token = signToken(authPayload);
   const refreshToken = signRefreshToken({ id: String(user.id), type: "refresh" });
@@ -89,7 +125,7 @@ async function createSessionTokens(user) {
     [Number(user.id), hashToken(refreshToken), Number(decoded.exp)]
   );
 
-  return { token, refreshToken, roles };
+  return { token, refreshToken, roles, permissions };
 }
 
 export async function register(req, res) {
@@ -144,12 +180,12 @@ export async function register(req, res) {
     [Number(user.id), String(user.role)]
   );
 
-  const { token, refreshToken, roles } = await createSessionTokens(user);
+  const { token, refreshToken, roles, permissions } = await createSessionTokens(user);
 
   return res.status(201).json({
     token,
     refreshToken,
-    user: toUserPayload({ ...user, roles })
+    user: toUserPayload({ ...user, roles, permissions })
   });
 }
 
@@ -183,12 +219,12 @@ export async function login(req, res) {
     return res.status(401).json({ message: "Identifiants invalides" });
   }
 
-  const { token, refreshToken, roles } = await createSessionTokens(user);
+  const { token, refreshToken, roles, permissions } = await createSessionTokens(user);
 
   return res.json({
     token,
     refreshToken,
-    user: toUserPayload({ ...user, roles })
+    user: toUserPayload({ ...user, roles, permissions })
   });
 }
 
@@ -263,11 +299,11 @@ export async function mobileUserSession(req, res) {
       `INSERT INTO user_roles (user_id, role) VALUES ($1, 'USER') ON CONFLICT (user_id, role) DO NOTHING`,
       [Number(user.id)]
     );
-    const { token, refreshToken, roles } = await createSessionTokens(user);
+    const { token, refreshToken, roles, permissions } = await createSessionTokens(user);
     return res.status(201).json({
       token,
       refreshToken,
-      user: toUserPayload({ ...user, roles })
+      user: toUserPayload({ ...user, roles, permissions })
     });
   } catch (error) {
     if (error?.code !== "23505") throw error;
@@ -286,11 +322,11 @@ export async function mobileUserSession(req, res) {
       `INSERT INTO user_roles (user_id, role) VALUES ($1, 'USER') ON CONFLICT (user_id, role) DO NOTHING`,
       [Number(user.id)]
     );
-    const { token, refreshToken, roles } = await createSessionTokens(user);
+    const { token, refreshToken, roles, permissions } = await createSessionTokens(user);
     return res.status(201).json({
       token,
       refreshToken,
-      user: toUserPayload({ ...user, roles })
+      user: toUserPayload({ ...user, roles, permissions })
     });
   }
 }
@@ -359,11 +395,11 @@ export async function refresh(req, res) {
   if (user.is_active === false) {
     return res.status(403).json({ message: "Compte desactive" });
   }
-  const { token, refreshToken, roles } = await createSessionTokens(user);
+  const { token, refreshToken, roles, permissions } = await createSessionTokens(user);
 
   return res.json({
     token,
     refreshToken,
-    user: toUserPayload({ ...user, roles })
+    user: toUserPayload({ ...user, roles, permissions })
   });
 }

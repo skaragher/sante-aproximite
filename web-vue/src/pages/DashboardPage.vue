@@ -36,6 +36,9 @@
     <RolesSection
       v-if="store.tab === 'roles' && store.isRegulator"
     />
+    <SecurityAlertSection
+      v-if="store.tab === 'security-alerts' && store.isSecurityResponder"
+    />
   </main>
 </template>
 
@@ -54,9 +57,9 @@ import OverviewSection from "../components/dashboard/OverviewSection.vue";
 import SamuSection from "../components/dashboard/SamuSection.vue";
 import SapeurPompierSection from "../components/dashboard/SapeurPompierSection.vue";
 import RolesSection from "../components/dashboard/RolesSection.vue";
+import SecurityAlertSection from "../components/dashboard/SecurityAlertSection.vue";
 import SettingsSection from "../components/dashboard/SettingsSection.vue";
 
-const normalizeRole = (v) => String(v || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
 const isSamu = computed(() => store.authRoles.includes("SAMU"));
 const isSapeurPompier = computed(() =>
   store.authRoles.some((r) => ["SAPEUR_POMPIER", "SAPEUR_POMPIER"].includes(r))
@@ -65,33 +68,49 @@ const isSapeurPompier = computed(() =>
 const route = useRoute();
 const store = useDashboardStore();
 
+function runBackground(task) {
+  Promise.resolve()
+    .then(task)
+    .catch(() => {});
+}
+
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(() => {
   store.tab = store.resolveTab(route.query.tab);
 
   if (store.isEmergencyResponder && !store.isNational) {
-    store.fetchEmergencyAlerts();
+    runBackground(() => store.fetchEmergencyAlerts());
     store.startEmergencyAutoRefresh();
   }
 
+  if (store.isSecurityResponder && !store.isNational) {
+    runBackground(() => store.fetchSecurityAlerts());
+  }
+
   if (store.canManageUsers && !store.isRegulator) {
-    store.fetchUsers();
+    runBackground(() => store.fetchUsers());
   }
 
   if (store.isRegulator) {
-    store.fetchUsers();
-    store.fetchPendingCenters();
-    store.fetchRegions();
-    store.fetchDistricts();
-    store.fetchComplaints();
-    store.fetchComplaintSummary();
+    runBackground(() => Promise.allSettled([
+      store.fetchAllCenters(),
+      store.fetchUsers(),
+      store.fetchPendingCenters(),
+      store.fetchRegions(),
+      store.fetchDistricts(),
+      store.fetchComplaints(),
+      store.fetchComplaintSummary(),
+    ]));
   }
 
   if (store.isChef) {
-    store.fetchAllCenters().then(() => {
+    runBackground(async () => {
+      await store.fetchAllCenters();
       if (!store.hasApprovedChefCenter) return;
-      store.fetchComplaints();
-      store.fetchComplaintSummary();
+      await Promise.allSettled([
+        store.fetchComplaints(),
+        store.fetchComplaintSummary(),
+      ]);
     });
   }
 });
@@ -104,28 +123,48 @@ onBeforeUnmount(() => {
 watch(
   () => store.tab,
   async (value) => {
+    if (value === "overview" && store.isRegulator && store.allCenters.length === 0) {
+      await Promise.resolve(store.fetchAllCenters()).catch(() => {});
+    }
     if (value === "emergency-alerts" && store.isEmergencyResponder) {
-      await store.fetchEmergencyAlerts();
+      await Promise.resolve(store.fetchEmergencyAlerts()).catch(() => {});
+    }
+    if (value === "security-alerts" && store.isSecurityResponder) {
+      await Promise.resolve(store.fetchSecurityAlerts()).catch(() => {});
     }
     if (value === "complaints" && store.canSeeComplaintsPanel) {
-      await store.fetchComplaints();
-      await store.fetchComplaintSummary();
+      await Promise.allSettled([
+        store.fetchComplaints(),
+        store.fetchComplaintSummary(),
+      ]);
     }
     if (
       (value === "my-center" || value === "settings" || value === "evaluations") &&
       store.allCenters.length === 0
     ) {
-      await store.fetchAllCenters();
+      await Promise.resolve(store.fetchAllCenters()).catch(() => {});
     }
     if (value === "settings" && store.isRegulator) {
-      await store.fetchAllCenters();
+      await Promise.allSettled([
+        store.allCenters.length === 0 ? store.fetchAllCenters() : Promise.resolve(),
+        store.users.length === 0 ? store.fetchUsers() : Promise.resolve(),
+        store.pendingCenters.length === 0 ? store.fetchPendingCenters() : Promise.resolve(),
+        store.regions.length === 0 ? store.fetchRegions() : Promise.resolve(),
+        store.districts.length === 0 ? store.fetchDistricts() : Promise.resolve(),
+      ]);
     }
     if ((value === "settings" || value === "imports") && store.isRegulator) {
-      if (store.regions.length === 0) await store.fetchRegions();
-      if (store.districts.length === 0) await store.fetchDistricts();
+      if (store.regions.length === 0) await Promise.resolve(store.fetchRegions()).catch(() => {});
+      if (store.districts.length === 0) await Promise.resolve(store.fetchDistricts()).catch(() => {});
     }
     if (value === "evaluations" && store.canSeeComplaintsPanel) {
-      await store.fetchComplaintSummary();
+      await Promise.resolve(store.fetchComplaintSummary()).catch(() => {});
+    }
+    if (value === "roles") {
+      await Promise.allSettled([
+        store.fetchRbacRoles(),
+        store.fetchRbacPermissions(),
+      ]);
     }
   }
 );
@@ -142,8 +181,10 @@ watch(
   () => {
     store.tab = store.resolveTab(route.query.tab);
     if (store.isRegulator) {
-      store.fetchRegions();
-      store.fetchDistricts();
+      runBackground(() => Promise.allSettled([
+        store.fetchRegions(),
+        store.fetchDistricts(),
+      ]));
     }
   }
 );

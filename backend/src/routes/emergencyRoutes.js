@@ -15,7 +15,7 @@ const router = Router();
 
 // Opérations d'urgence : réservées aux services d'urgence uniquement
 // NATIONAL / REGULATOR / REGION / DISTRICT n'ont pas accès aux données opérationnelles
-const EMERGENCY_ROLES = ["SAMU", "SAPEUR_POMPIER"];
+const EMERGENCY_ROLES = ["SAMU", "SAPEUR_POMPIER", "DEVELOPER"];
 
 router.post("/", requireAuth, requireRole(EMERGENCY_ROLES), createEmergencyReport);
 router.get("/", requireAuth, requireRole(EMERGENCY_ROLES), getEmergencyReports);

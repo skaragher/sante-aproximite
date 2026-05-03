@@ -5,7 +5,7 @@
     <div class="ov-header">
       <div class="ov-header-left">
         <h2 class="ov-title">Tableau de bord</h2>
-        <p class="ov-subtitle">📅 {{ currentYear }} — Vue globale — Données en temps réel</p>
+        <p class="ov-subtitle">📅 {{ currentYear }} - Vue globale - Données en temps réel</p>
       </div>
       <div class="ov-header-right">
         <div class="ov-rate-badge" v-if="store.allCenters.length > 0">
@@ -70,7 +70,7 @@
         </div>
         <div class="ov-card-value">{{ store.regions.length }}</div>
         <div class="ov-card-sub">Régions actives</div>
-        <div class="ov-card-detail">Districts : {{ store.districts?.length || '—' }}</div>
+        <div class="ov-card-detail">Districts : {{ store.districts?.length || '-' }}</div>
       </div>
 
       <div class="ov-card ov-card-orange">
@@ -92,7 +92,7 @@
 
     <!-- ═══ Barre récapitulative ═══ -->
     <div class="ov-summary-bar">
-      <div class="ov-summary-title">📊 {{ currentYear }} — Vue globale</div>
+      <div class="ov-summary-title">📊 {{ currentYear }} - Vue globale</div>
       <div class="ov-summary-stats">
         <div class="ov-summary-stat">
           <span class="ov-summary-val">{{ store.allCenters.length }}</span>
@@ -115,7 +115,7 @@
           <span class="ov-summary-lbl">Alertes</span>
         </div>
         <div class="ov-summary-stat" v-else>
-          <span class="ov-summary-val">{{ store.districts?.length || '—' }}</span>
+          <span class="ov-summary-val">{{ store.districts?.length || '-' }}</span>
           <span class="ov-summary-lbl">Districts</span>
         </div>
       </div>
@@ -126,7 +126,7 @@
 
       <div class="ov-chart-card">
         <div class="ov-chart-header">
-          <span class="ov-chart-title">📊 Centres enregistrés par mois — {{ currentYear }}</span>
+          <span class="ov-chart-title">📊 Centres enregistrés par mois - {{ currentYear }}</span>
           <span class="ov-chart-badge">Total : {{ store.allCenters.length }}</span>
         </div>
         <div class="ov-bar-chart-wrap">

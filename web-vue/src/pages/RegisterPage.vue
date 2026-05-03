@@ -85,6 +85,7 @@
               <option value="POLICE">Police</option>
               <option value="GENDARMERIE">Gendarmerie</option>
               <option value="PROTECTION_CIVILE">Protection Civile</option>
+              <option value="DEVELOPER">Développeur</option>
             </select>
           </div>
 

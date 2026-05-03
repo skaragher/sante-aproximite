@@ -14,9 +14,12 @@ const state = reactive({
 export function useAuthStore() {
   function login(payload) {
     state.token = payload.token;
-    state.user = payload.user;
+    state.user = {
+      ...payload.user,
+      permissions: Array.isArray(payload.user?.permissions) ? payload.user.permissions : [],
+    };
     localStorage.setItem(TOKEN_KEY, payload.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(payload.user));
+    localStorage.setItem(USER_KEY, JSON.stringify(state.user));
   }
 
   function logout() {

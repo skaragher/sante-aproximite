@@ -97,7 +97,7 @@
         </div>
 
         <div class="auth-secure-badge">
-          <span>🔒</span> Plateforme securisee — acces restreint aux personnels autorises
+          <span>🔒</span> Plateforme securisee - acces restreint aux personnels autorises
         </div>
 
       </div>

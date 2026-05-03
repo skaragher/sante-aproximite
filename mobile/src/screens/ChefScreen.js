@@ -1,6 +1,6 @@
 import * as Location from "expo-location";
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { apiFetch } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { C, R, S, shared } from "../theme";
@@ -48,8 +48,18 @@ function parseServices(servicesCsv) {
   return servicesCsv.split(",").map((item) => item.trim()).filter(Boolean).map((name) => ({ name }));
 }
 
+function formatGeoOption(option) {
+  if (!option) return "";
+  const code = String(option.code || "").trim().toUpperCase();
+  const name = String(option.name || "").trim();
+  if (name && code) return `${name} (${code})`;
+  return name || code;
+}
+
 export function ChefScreen() {
   const { token } = useAuth();
+  const scrollRef = useRef(null);
+  const inputRefs = useRef({});
   const [centerId, setCenterId]                         = useState("");
   const [centerApprovalStatus, setCenterApprovalStatus] = useState(null);
   const [error, setError]                               = useState("");
@@ -221,9 +231,37 @@ export function ChefScreen() {
 
   const f = form;
   function setF(key, v) { setForm((p) => ({ ...p, [key]: v })); }
+  function registerInputRef(key, ref) {
+    if (ref) inputRefs.current[key] = ref;
+  }
+
+  function scrollToField(key) {
+    const input = inputRefs.current[key];
+    const scroll = scrollRef.current;
+    if (!input || !scroll || typeof input.measureLayout !== "function") return;
+    const target = typeof scroll.getInnerViewNode === "function" ? scroll.getInnerViewNode() : scroll;
+    requestAnimationFrame(() => {
+      input.measureLayout(
+        target,
+        (_x, y) => scroll.scrollTo?.({ y: Math.max(0, y - 24), animated: true }),
+        () => {}
+      );
+    });
+  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 12}
+    >
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+    >
 
       {/* Header */}
       <View style={styles.header}>
@@ -244,15 +282,15 @@ export function ChefScreen() {
         <Text style={styles.sectionLabel}>INFORMATIONS GENERALES</Text>
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Nom du centre</Text>
-          <TextInput style={shared.input} placeholder="Nom du centre" value={f.name} onChangeText={(v) => setF("name", v)} />
+          <TextInput ref={(ref) => registerInputRef("name", ref)} onFocus={() => scrollToField("name")} style={shared.input} placeholder="Nom du centre" value={f.name} onChangeText={(v) => setF("name", v)} />
         </View>
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Adresse</Text>
-          <TextInput style={shared.input} placeholder="Adresse complete" value={f.address} onChangeText={(v) => setF("address", v)} />
+          <TextInput ref={(ref) => registerInputRef("address", ref)} onFocus={() => scrollToField("address")} style={shared.input} placeholder="Adresse complete" value={f.address} onChangeText={(v) => setF("address", v)} />
         </View>
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Code etablissement (optionnel)</Text>
-          <TextInput style={shared.input} placeholder="Ex: ABIDJAN-001" autoCapitalize="characters" value={f.establishmentCode} onChangeText={(v) => setF("establishmentCode", v)} />
+          <TextInput ref={(ref) => registerInputRef("establishmentCode", ref)} onFocus={() => scrollToField("establishmentCode")} style={shared.input} placeholder="Ex: ABIDJAN-001" autoCapitalize="characters" value={f.establishmentCode} onChangeText={(v) => setF("establishmentCode", v)} />
         </View>
       </View>
 
@@ -261,7 +299,7 @@ export function ChefScreen() {
         <Text style={styles.sectionLabel}>LOCALISATION</Text>
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Region</Text>
-          <TextInput style={shared.input} placeholder="Code region (ex: ABIDJAN)" autoCapitalize="characters" value={f.regionCode} onChangeText={(v) => { setF("regionCode", v); setF("districtCode", ""); }} />
+          <TextInput ref={(ref) => registerInputRef("regionCode", ref)} onFocus={() => scrollToField("regionCode")} style={shared.input} placeholder="Code region (ex: ABIDJAN)" autoCapitalize="characters" value={f.regionCode} onChangeText={(v) => { setF("regionCode", v); setF("districtCode", ""); }} />
         </View>
         {regions.length ? (
           <View>
@@ -269,30 +307,38 @@ export function ChefScreen() {
             <View style={styles.chipGroup}>
               {regions.map((region) => (
                 <Pressable key={region.code} style={[styles.chip, f.regionCode === region.code && styles.chipActive]} onPress={() => setForm((p) => ({ ...p, regionCode: region.code, districtCode: "" }))}>
-                  <Text style={[styles.chipText, f.regionCode === region.code && styles.chipTextActive]}>{region.code}</Text>
+                  <Text style={[styles.chipText, f.regionCode === region.code && styles.chipTextActive]}>{formatGeoOption(region)}</Text>
                 </Pressable>
               ))}
             </View>
           </View>
         ) : null}
         {geoLoading ? <Text style={styles.geoLoading}>Chargement...</Text> : null}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>District (optionnel)</Text>
-          <TextInput style={shared.input} placeholder="Code district" autoCapitalize="characters" value={f.districtCode} onChangeText={(v) => setF("districtCode", v)} />
-        </View>
-        {districts.length ? (
-          <View>
-            <Text style={styles.fieldLabel}>Selection rapide district</Text>
-            <View style={styles.chipGroup}>
-              {districts.map((district) => (
-                <Pressable key={district.code} style={[styles.chip, f.districtCode === district.code && styles.chipActive]} onPress={() => setForm((p) => ({ ...p, districtCode: district.code }))}>
-                  <Text style={[styles.chipText, f.districtCode === district.code && styles.chipTextActive]}>{district.code}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
       </View>
+
+      {String(f.regionCode || "").trim() ? (
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>DISTRICTS DE LA REGION</Text>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>District (optionnel)</Text>
+            <TextInput ref={(ref) => registerInputRef("districtCode", ref)} onFocus={() => scrollToField("districtCode")} style={shared.input} placeholder="Code district" autoCapitalize="characters" value={f.districtCode} onChangeText={(v) => setF("districtCode", v)} />
+          </View>
+          {districts.length ? (
+            <View>
+              <Text style={styles.fieldLabel}>Selection rapide district</Text>
+              <View style={styles.chipGroup}>
+                {districts.map((district) => (
+                  <Pressable key={district.code} style={[styles.chip, f.districtCode === district.code && styles.chipActive]} onPress={() => setForm((p) => ({ ...p, districtCode: district.code }))}>
+                    <Text style={[styles.chipText, f.districtCode === district.code && styles.chipTextActive]}>{formatGeoOption(district)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.geoLoading}>Aucun district charge pour cette region.</Text>
+          )}
+        </View>
+      ) : null}
 
       {/* Classification */}
       <View style={styles.card}>
@@ -320,11 +366,11 @@ export function ChefScreen() {
         <Text style={styles.sectionLabel}>SERVICES & PLATEAU TECHNIQUE</Text>
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Plateau technique</Text>
-          <TextInput style={[shared.input, shared.textArea]} multiline placeholder="Plateau technique" value={f.technicalPlatform} onChangeText={(v) => setF("technicalPlatform", v)} />
+          <TextInput ref={(ref) => registerInputRef("technicalPlatform", ref)} onFocus={() => scrollToField("technicalPlatform")} style={[shared.input, shared.textArea]} multiline placeholder="Plateau technique" value={f.technicalPlatform} onChangeText={(v) => setF("technicalPlatform", v)} />
         </View>
         <View style={styles.fieldGroup}>
           <Text style={styles.fieldLabel}>Services (separes par virgule)</Text>
-          <TextInput style={shared.input} placeholder="Urgences, Radiologie, Pediatrie..." value={f.servicesCsv} onChangeText={(v) => setF("servicesCsv", v)} />
+          <TextInput ref={(ref) => registerInputRef("servicesCsv", ref)} onFocus={() => scrollToField("servicesCsv")} style={shared.input} placeholder="Urgences, Radiologie, Pediatrie..." value={f.servicesCsv} onChangeText={(v) => setF("servicesCsv", v)} />
         </View>
       </View>
 
@@ -334,11 +380,11 @@ export function ChefScreen() {
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>Latitude</Text>
-            <TextInput style={shared.input} keyboardType="numeric" placeholder="5.3600" value={f.latitude} onChangeText={(v) => setF("latitude", v)} />
+            <TextInput ref={(ref) => registerInputRef("latitude", ref)} onFocus={() => scrollToField("latitude")} style={shared.input} keyboardType="numeric" placeholder="5.3600" value={f.latitude} onChangeText={(v) => setF("latitude", v)} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.fieldLabel}>Longitude</Text>
-            <TextInput style={shared.input} keyboardType="numeric" placeholder="-4.0083" value={f.longitude} onChangeText={(v) => setF("longitude", v)} />
+            <TextInput ref={(ref) => registerInputRef("longitude", ref)} onFocus={() => scrollToField("longitude")} style={shared.input} keyboardType="numeric" placeholder="-4.0083" value={f.longitude} onChangeText={(v) => setF("longitude", v)} />
           </View>
         </View>
         <Pressable style={styles.outlineBtn} onPress={getCurrentPosition}>
@@ -395,6 +441,8 @@ export function ChefScreen() {
               </View>
               <Text style={styles.complaintBody}>{item.message}</Text>
               <TextInput
+                ref={(ref) => registerInputRef(`complaint-${item.id}`, ref)}
+                onFocus={() => scrollToField(`complaint-${item.id}`)}
                 style={[shared.input, shared.textArea]}
                 multiline
                 placeholder="Ajouter une explication..."
@@ -409,6 +457,7 @@ export function ChefScreen() {
         </View>
       ) : null}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

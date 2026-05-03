@@ -209,7 +209,7 @@ export async function listUsers(req, res) {
 
   // Priorité de rôle la plus haute du requérant
   const ROLE_PRIORITY = [
-    "NATIONAL", "REGULATOR", "REGION", "DISTRICT",
+    "DEVELOPER", "NATIONAL", "REGULATOR", "REGION", "DISTRICT",
     "ETABLISSEMENT", "CHEF_ETABLISSEMENT", "SAMU", "SAPEUR_POMPIER"
   ];
   const effectiveRole =
@@ -231,7 +231,9 @@ export async function listUsers(req, res) {
     "NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","USER"
   ];
 
-  if (effectiveRole === "NATIONAL") {
+  if (effectiveRole === "DEVELOPER") {
+    // DEVELOPER voit tous les comptes sans restriction de périmètre
+  } else if (effectiveRole === "NATIONAL") {
     // NATIONAL voit uniquement les comptes du système de santé
     whereParts.push(`u.role = ANY($${params.length + 1}::text[])`);
     params.push(NATIONAL_HEALTH_ROLES);
@@ -338,6 +340,7 @@ export async function listUsers(req, res) {
 
 // Rôles qu'un niveau peut créer (hiérarchie descendante uniquement)
 const CREATABLE_ROLES_BY_LEVEL = {
+  DEVELOPER:         null,
   // NATIONAL gère uniquement le système de santé — pas les services d'urgence/sécurité
   NATIONAL:          ["NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","USER"],
   REGULATOR:         ["REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER","USER"],
@@ -369,7 +372,7 @@ export async function createUser(req, res) {
   const creatorRoles = Array.isArray(req.user?.roles)
     ? req.user.roles.map((r) => String(r || "").toUpperCase())
     : [String(req.user?.role || "").toUpperCase()];
-  const ROLE_PRIORITY = ["NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"];
+  const ROLE_PRIORITY = ["DEVELOPER","NATIONAL","REGULATOR","REGION","DISTRICT","ETABLISSEMENT","CHEF_ETABLISSEMENT","SAMU","SAPEUR_POMPIER"];
   const creatorLevel = ROLE_PRIORITY.find((r) => creatorRoles.includes(r)) || creatorRoles[0];
   const allowedToCreate = CREATABLE_ROLES_BY_LEVEL[creatorLevel];
   if (allowedToCreate !== null && allowedToCreate !== undefined) {
@@ -380,7 +383,10 @@ export async function createUser(req, res) {
       return res.status(403).json({ message: `Vous n'avez pas le droit de créer un compte de type ${forbidden}` });
     }
   }
-  if (normalizedRoles.includes("USER") && creatorLevel !== "NATIONAL" && !hasManagePublicUsersPermission(req.user)) {
+  if (normalizedRoles.includes("DEVELOPER") && creatorLevel !== "DEVELOPER") {
+    return res.status(403).json({ message: "Seul un compte Developer peut attribuer le rôle Developer." });
+  }
+  if (normalizedRoles.includes("USER") && !["NATIONAL", "DEVELOPER"].includes(creatorLevel) && !hasManagePublicUsersPermission(req.user)) {
     return res.status(403).json({
       message: "Vous devez disposer du droit de gestion des utilisateurs publics pour creer un compte USER."
     });
@@ -485,10 +491,14 @@ export async function updateUser(req, res) {
   const current = currentResult.rows[0];
   const normalizedRoles = normalizeRolesInput(roles, role || current.role);
   const primaryRole = extractPrimaryRole(normalizedRoles, role || current.role);
+  const requesterRole = String(req.user?.role || "").toUpperCase();
+  if (normalizedRoles.includes("DEVELOPER") && requesterRole !== "DEVELOPER") {
+    return res.status(403).json({ message: "Seul un compte Developer peut attribuer le rôle Developer." });
+  }
   if (
     normalizedRoles.includes("USER") &&
     !hasManagePublicUsersPermission(req.user) &&
-    String(req.user?.role || "").toUpperCase() !== "NATIONAL"
+    !["DEVELOPER", "NATIONAL"].includes(requesterRole)
   ) {
     return res.status(403).json({
       message: "Vous devez disposer du droit de gestion des utilisateurs publics pour creer ou modifier un compte USER."

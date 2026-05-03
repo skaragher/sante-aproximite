@@ -37,8 +37,8 @@ const CENTER_LEVEL_ALIASES = new Map([
 ]);
 
 const ETABLISSEMENT_ROLES = new Set(["ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
-const ADMIN_ROLES = new Set(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"]);
-const COMPLAINT_VIEW_ROLES = new Set(["REGULATOR", "NATIONAL", "REGION", "DISTRICT", "ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
+const ADMIN_ROLES = new Set(["DEVELOPER", "REGULATOR", "NATIONAL", "REGION", "DISTRICT"]);
+const COMPLAINT_VIEW_ROLES = new Set(["DEVELOPER", "REGULATOR", "NATIONAL", "REGION", "DISTRICT", "ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
 
 function isEtablissementRole(role) {
   return ETABLISSEMENT_ROLES.has(role);
@@ -107,6 +107,7 @@ async function getRequesterScope(req) {
     ? req.user.roles.map((value) => String(value || "").trim().toUpperCase()).filter(Boolean)
     : [];
   const scopePriority = [
+    "DEVELOPER",
     "REGULATOR",
     "NATIONAL",
     "REGION",
@@ -167,18 +168,24 @@ function applyCenterScope(whereParts, params, scope, centerAlias = "hc", options
     if (onlyApprovedForEstablishment) {
       whereParts.push(`${centerAlias}.approval_status = 'APPROVED'`);
     }
+    const accessParts = [];
     if (scope.centerId) {
-      whereParts.push(`${centerAlias}.id = $${params.length + 1}`);
+      accessParts.push(`${centerAlias}.id = $${params.length + 1}`);
       params.push(Number(scope.centerId));
-      return;
     }
     if (scope.establishmentCode) {
-      whereParts.push(`upper(${centerAlias}.establishment_code) = $${params.length + 1}`);
+      accessParts.push(`upper(${centerAlias}.establishment_code) = $${params.length + 1}`);
       params.push(scope.establishmentCode);
+    }
+    if (scope.userId) {
+      accessParts.push(`${centerAlias}.created_by = $${params.length + 1}`);
+      params.push(Number(scope.userId));
+    }
+    if (accessParts.length === 0) {
+      whereParts.push("1 = 0");
       return;
     }
-    whereParts.push(`${centerAlias}.created_by = $${params.length + 1}`);
-    params.push(Number(scope.userId));
+    whereParts.push(`(${accessParts.join(" OR ")})`);
     return;
   }
   if (scope.role === "DISTRICT") {
@@ -223,14 +230,16 @@ async function canViewCenterByScope(scope, centerId, options = {}) {
     if (onlyApprovedForEstablishment && String(center.approval_status || "").toUpperCase() !== "APPROVED") {
       return { exists: true, allowed: false };
     }
-    if (scope.centerId) {
-      return { exists: true, allowed: Number(center.id) === Number(scope.centerId) };
-    }
-    if (scope.establishmentCode) {
-      const centerCode = normalizeEstablishmentCode(center.establishment_code);
-      return { exists: true, allowed: !!centerCode && centerCode === scope.establishmentCode };
-    }
-    return { exists: true, allowed: String(center.created_by) === String(scope.userId) };
+    const matchesCenterId = scope.centerId ? Number(center.id) === Number(scope.centerId) : false;
+    const centerCode = normalizeEstablishmentCode(center.establishment_code);
+    const matchesEstablishmentCode = scope.establishmentCode
+      ? !!centerCode && centerCode === scope.establishmentCode
+      : false;
+    const matchesCreator = scope.userId ? String(center.created_by) === String(scope.userId) : false;
+    return {
+      exists: true,
+      allowed: matchesCenterId || matchesEstablishmentCode || matchesCreator
+    };
   }
   if (scope.role === "DISTRICT") {
     const centerDistrict = normalizeGeoCode(center.district_code);

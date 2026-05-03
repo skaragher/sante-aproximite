@@ -7,7 +7,7 @@
         <span class="sp-badge">🚒 SAPEURS-POMPIERS</span>
         <div>
           <h2 class="sp-title">Centre Opérationnel de Secours</h2>
-          <p class="sp-subtitle">Service Départemental d'Incendie et de Secours — Tableau de bord opérationnel</p>
+          <p class="sp-subtitle">Service Départemental d'Incendie et de Secours - Tableau de bord opérationnel</p>
         </div>
       </div>
       <div class="sp-header-right">
@@ -83,7 +83,7 @@
 
     <!-- ═══ Barre récapitulative ═══ -->
     <div class="sp-summary-bar">
-      <div class="sp-summary-title">🪣 Récapitulatif période — {{ periodLabel }}</div>
+      <div class="sp-summary-title">🪣 Récapitulatif période - {{ periodLabel }}</div>
       <div class="sp-summary-stats">
         <div class="sp-stat">
           <span class="sp-stat-val">{{ totalAlerts }}</span>
@@ -114,7 +114,7 @@
       <!-- Barres : appels par heure -->
       <div class="sp-chart-card">
         <div class="sp-chart-header">
-          <span class="sp-chart-title">📊 Appels reçus par heure — période en cours</span>
+          <span class="sp-chart-title">📊 Appels reçus par heure - période en cours</span>
           <span class="sp-chart-badge">Total : {{ totalAlerts }}</span>
         </div>
         <div class="sp-bar-wrap">
@@ -167,7 +167,7 @@
     <!-- ═══ Interventions actives ═══ -->
     <div class="sp-active-section" v-if="activeAlerts.length > 0">
       <div class="sp-section-header">
-        <span class="sp-section-title">🔴 Interventions actives — à traiter</span>
+        <span class="sp-section-title">🔴 Interventions actives - à traiter</span>
         <button class="secondary sp-see-all" @click="store.tab = 'emergency-alerts'">
           Tout voir →
         </button>

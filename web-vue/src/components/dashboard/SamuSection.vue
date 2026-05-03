@@ -7,7 +7,7 @@
         <span class="samu-badge">🚑 SAMU</span>
         <div>
           <h2 class="samu-title">Centre de Régulation Médicale</h2>
-          <p class="samu-subtitle">Service d'Aide Médicale Urgente — Tableau de bord opérationnel</p>
+          <p class="samu-subtitle">Service d'Aide Médicale Urgente - Tableau de bord opérationnel</p>
         </div>
       </div>
       <div class="samu-header-right">
@@ -86,7 +86,7 @@
     <!-- ═══ Barre récapitulative ═══ -->
     <div class="samu-summary-bar">
       <div class="samu-summary-left">
-        <span class="samu-summary-title">🩺 Récapitulatif période — {{ periodLabel }}</span>
+        <span class="samu-summary-title">🩺 Récapitulatif période - {{ periodLabel }}</span>
       </div>
       <div class="samu-summary-stats">
         <div class="samu-stat">
@@ -118,7 +118,7 @@
       <!-- Barres : alertes par heure -->
       <div class="samu-chart-card">
         <div class="samu-chart-header">
-          <span class="samu-chart-title">📊 Alertes par heure — période en cours</span>
+          <span class="samu-chart-title">📊 Alertes par heure - période en cours</span>
           <span class="samu-chart-badge">Total : {{ totalAlerts }}</span>
         </div>
         <div class="samu-bar-wrap">
@@ -171,7 +171,7 @@
     <!-- ═══ Alertes actives urgentes ═══ -->
     <div class="samu-active-section" v-if="activeAlerts.length > 0">
       <div class="samu-section-header">
-        <span class="samu-section-title">🔴 Alertes actives — intervention requise</span>
+        <span class="samu-section-title">🔴 Alertes actives - intervention requise</span>
         <button class="secondary samu-see-all" @click="store.tab = 'emergency-alerts'">
           Tout voir →
         </button>

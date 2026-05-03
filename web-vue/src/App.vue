@@ -119,7 +119,10 @@ const currentTab = computed(() => String(route.query.tab || "").trim());
 const sidebarOpen = ref(false);
 const adminRoles = new Set(["REGULATOR", "NATIONAL", "REGION", "DISTRICT"]);
 const etablissementRoles = new Set(["ETABLISSEMENT", "CHEF_ETABLISSEMENT"]);
-const emergencyRoleValues = ["SAMU", "SAPEUR_POMPIER", "SAPEUR_POMPIER"];
+const emergencyRoleValues = ["SAMU", "SAPEUR_POMPIER"];
+const securityRoleValues = ["POLICE", "GENDARMERIE", "PROTECTION_CIVILE"];
+
+const isDeveloper = computed(() => roles.value.includes("DEVELOPER"));
 
 const menuItems = computed(() => {
   if (!auth.state.token) return [];
@@ -128,6 +131,20 @@ const menuItems = computed(() => {
   const pushItem = (item) => {
     if (!items.some((entry) => entry.tab === item.tab)) items.push(item);
   };
+
+  // DEVELOPER voit tout, dans toutes les sections
+  if (isDeveloper.value) {
+    pushItem({ tab: "overview",         label: "Dashboard",             icon: "▦",  section: "VUE D'ENSEMBLE",  decor: "📋" });
+    pushItem({ tab: "nearby",           label: "Centres de santé",      icon: "📍", section: "RESEAU DE SOINS",  decor: "🏥" });
+    pushItem({ tab: "emergency-alerts", label: "Alertes urgence",       icon: "🚨", section: "URGENCES",         decor: "🚨" });
+    pushItem({ tab: "complaints",       label: "Plaintes",              icon: "📝", section: "QUALITE",          decor: "📈" });
+    pushItem({ tab: "evaluations",      label: "Evaluations",           icon: "📊", section: "QUALITE",          decor: "📈" });
+    pushItem({ tab: "my-center",        label: "Mon centre",            icon: "🏥", section: "SUIVI SANITAIRE",  decor: "🩺" });
+    pushItem({ tab: "settings",         label: "Utilisateurs",          icon: "👥", section: "GOUVERNANCE",      decor: "⚙" });
+    pushItem({ tab: "imports",          label: "Importations",          icon: "📥", section: "GOUVERNANCE",      decor: "⚙" });
+    pushItem({ tab: "roles",            label: "Gestion des rôles",     icon: "🛡", section: "GOUVERNANCE",      decor: "⚙" });
+    return items;
+  }
 
   if (hasAnyRole([...etablissementRoles])) {
     pushItem({ tab: "my-center", label: "Mon centre", icon: "🏥", section: "SUIVI SANITAIRE", decor: "🩺" });
@@ -141,8 +158,13 @@ const menuItems = computed(() => {
   pushItem({ tab: "nearby", label: "Centre de santé", icon: "📍", section: "RESEAU DE SOINS", decor: "🏥" });
 
   if (hasAnyRole(emergencyRoleValues)) {
-    pushItem({ tab: "emergency-alerts", label: "Alertes urgence", icon: "🚨", section: "URGENCES", decor: "🚨" });
-    pushItem({ tab: "settings", label: "Utilisateurs", icon: "👥", section: "GOUVERNANCE", decor: "⚙" });
+    pushItem({ tab: "emergency-alerts", label: "Alertes urgence",  icon: "🚨", section: "URGENCES",          decor: "🚨" });
+    pushItem({ tab: "settings",         label: "Utilisateurs",     icon: "👥", section: "GOUVERNANCE",       decor: "⚙"  });
+  }
+
+  if (hasAnyRole(securityRoleValues)) {
+    pushItem({ tab: "security-alerts",  label: "Alertes sécurité", icon: "🛡", section: "SÉCURITÉ",          decor: "🛡" });
+    pushItem({ tab: "settings",         label: "Utilisateurs",     icon: "👥", section: "GOUVERNANCE",       decor: "⚙"  });
   }
 
   if (hasAnyRole([...adminRoles])) {
@@ -159,13 +181,17 @@ const menuItems = computed(() => {
 });
 
 const roleChipLabel = computed(() => {
-  if (hasRole("NATIONAL")) return "Niveau National";
-  if (hasRole("REGION")) return "Niveau Region";
-  if (hasRole("DISTRICT")) return "Niveau District";
-  if (hasRole("REGULATOR")) return "Autorite de regulation";
+  if (hasRole("DEVELOPER"))          return "Développeur";
+  if (hasRole("NATIONAL"))           return "Niveau National";
+  if (hasRole("REGULATOR"))          return "Autorite de regulation";
+  if (hasRole("REGION"))             return "Niveau Region";
+  if (hasRole("DISTRICT"))           return "Niveau District";
   if (hasAnyRole([...etablissementRoles])) return "Niveau Etablissement";
-  if (hasAnyRole(["SAPEUR_POMPIER", "SAPEUR_POMPIER"])) return "SAPEUR-POMPIER";
-  if (hasRole("SAMU")) return "Service SAMU";
+  if (hasRole("SAPEUR_POMPIER"))     return "Sapeur-Pompier";
+  if (hasRole("SAMU"))               return "Service SAMU";
+  if (hasRole("POLICE"))             return "Police Nationale";
+  if (hasRole("GENDARMERIE"))        return "Gendarmerie Nationale";
+  if (hasRole("PROTECTION_CIVILE"))  return "Protection Civile";
   return "Gestionnaire Plateforme";
 });
 const sidebarSections = computed(() => {

@@ -6,6 +6,7 @@ const VALID_TARGET_SERVICES = ["POLICE", "GENDARMERIE", "PROTECTION_CIVILE"];
 
 // Roles autorisés à lire/traiter les alertes sécurité
 const SECURITY_HANDLER_ROLES = new Set([
+  "DEVELOPER",
   "POLICE", "GENDARMERIE", "PROTECTION_CIVILE",
   "REGULATOR", "NATIONAL", "REGION", "DISTRICT"
 ]);
@@ -190,9 +191,13 @@ export async function updateSecurityAlertStatus(req, res) {
   const roleService = serviceFromRole(role);
 
   // Un agent opérationnel ne peut traiter que les alertes de son service
-  const serviceFilter = roleService
-    ? `AND sa.target_service = '${roleService}'`
-    : "";
+  // Les admins (roleService === null) peuvent traiter toutes les alertes
+  const queryParams = [alertId, status, Number(req.user.id)];
+  let serviceCondition = "";
+  if (roleService) {
+    queryParams.push(roleService);
+    serviceCondition = `AND sa.target_service = $${queryParams.length}`;
+  }
 
   const updated = await pool.query(
     `
@@ -202,10 +207,10 @@ export async function updateSecurityAlertStatus(req, res) {
         handled_by = COALESCE(sa.handled_by, $3),
         handled_at = COALESCE(sa.handled_at, NOW())
       WHERE sa.id = $1
-        ${serviceFilter}
+        ${serviceCondition}
       RETURNING *;
     `,
-    [alertId, status, Number(req.user.id)]
+    queryParams
   );
 
   if (updated.rowCount === 0) {
