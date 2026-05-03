@@ -4,7 +4,7 @@
       <div class="sidebar-head">
         
         <div class="sidebar-app-badge">
-          <img src="/logo-web.svg" alt="logo" class="shell-logo" />
+          <img src="/logo-web.png" alt="logo" class="shell-logo" />
         </div>
         <div>
           <h1 class="sidebar-app-title">SANTE APROXMITE</h1>
@@ -57,7 +57,7 @@
             ☰
           </button>
           <div class="topbar-app-badge">
-            <img src="/logo-web.svg" alt="logo" class="shell-logo" />
+            <img src="/logo-web.png" alt="logo" class="shell-logo" />
           </div>
           <p class="shell-topband-title">Sante Aproximite Platform</p>
           <p class="shell-topband-subtitle">Ecosysteme de pilotage des centres de sante</p>
@@ -73,7 +73,7 @@
       </header>
 
       <header v-if="!isAuthPage" class="shell-mobile-header">
-        <img src="/logo-web.svg" alt="logo" class="shell-logo small" />
+        <img src="/logo-web.png" alt="logo" class="shell-logo small" />
         <div class="shell-mobile-links">
           <RouterLink
             v-for="item in mobileMenuItems"

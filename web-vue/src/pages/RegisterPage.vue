@@ -3,7 +3,7 @@
     <!-- Left brand panel -->
     <section class="auth-brand">
       <div class="auth-brand-logo">
-        <img src="/logo-web.svg" alt="logo" />
+        <img src="/logo-web.png" alt="logo" />
       </div>
       <h1>Sante Aproximite</h1>
       <p>Rejoignez la plateforme nationale de gestion et de pilotage des etablissements sanitaires.</p>

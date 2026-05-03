@@ -8,7 +8,7 @@
       <div class="auth-brand-blob-3"></div>
 
       <div class="auth-brand-logo">
-        <img src="/logo-web.svg" alt="logo" />
+        <img src="/logo-web.png" alt="logo" />
       </div>
 
       <h1>Sante<br/>Aproximite</h1>
@@ -43,7 +43,7 @@
       <div class="auth-card">
 
         <div class="auth-card-logo">
-          <img src="/logo-web.svg" alt="logo" />
+          <img src="/logo-web.png" alt="logo" />
         </div>
 
         <div class="auth-card-header">
