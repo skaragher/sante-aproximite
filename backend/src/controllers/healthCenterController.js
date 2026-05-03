@@ -223,7 +223,7 @@ async function canViewCenterByScope(scope, centerId, options = {}) {
   }
 
   const center = centerResult.rows[0];
-  if (scope.role === "REGULATOR" || scope.role === "NATIONAL") {
+  if (scope.role === "DEVELOPER" || scope.role === "REGULATOR" || scope.role === "NATIONAL") {
     return { exists: true, allowed: true };
   }
   if (scope.role === "ETABLISSEMENT" || scope.role === "CHEF_ETABLISSEMENT") {
@@ -2014,7 +2014,7 @@ export async function getComplaintsSummary(req, res) {
     params
   );
 
-  const aggregateByAllScopedCenters = ["DISTRICT", "REGION", "NATIONAL", "REGULATOR"].includes(scope.role);
+  const aggregateByAllScopedCenters = ["DEVELOPER", "DISTRICT", "REGION", "NATIONAL", "REGULATOR"].includes(scope.role);
   const ratingsAgg = aggregateByAllScopedCenters
     ? await pool.query(
         `
@@ -2164,7 +2164,7 @@ export async function updateComplaintStatus(req, res) {
     if (!access.allowed) {
       return res.status(403).json({ message: "Acces refuse a cette plainte" });
     }
-  } else if (!requesterRoles.some((role) => ["NATIONAL", "REGULATOR"].includes(role))) {
+  } else if (!requesterRoles.some((role) => ["DEVELOPER", "NATIONAL", "REGULATOR"].includes(role))) {
     return res.status(403).json({ message: "Acces refuse a cette plainte" });
   }
 
@@ -2252,7 +2252,7 @@ export async function addComplaintExplanation(req, res) {
     if (!access.allowed) {
       return res.status(403).json({ message: "Acces refuse a cette plainte" });
     }
-  } else if (!requesterRoles.some((role) => ["NATIONAL", "REGULATOR"].includes(role))) {
+  } else if (!requesterRoles.some((role) => ["DEVELOPER", "NATIONAL", "REGULATOR"].includes(role))) {
     return res.status(403).json({ message: "Acces refuse a cette plainte" });
   }
 

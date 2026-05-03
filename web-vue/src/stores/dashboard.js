@@ -110,10 +110,10 @@ const _store = (() => {
     () => approvedChefCenters.value.length > 0
   );
   const canSeeComplaintsPanel = computed(
-    () => isRegulator.value || (isChef.value && hasApprovedChefCenter.value)
+    () => isDeveloper.value || isRegulator.value || (isChef.value && hasApprovedChefCenter.value)
   );
   const canHandleComplaintActions = computed(
-    () => isRegulator.value || (isChef.value && hasApprovedChefCenter.value)
+    () => isDeveloper.value || isRegulator.value || (isChef.value && hasApprovedChefCenter.value)
   );
 
   const filteredNearbyCenters = computed(() => {
