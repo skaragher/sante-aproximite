@@ -1,10 +1,12 @@
-import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, getPendingRequestsCount, syncPendingRequests } from "./api/client";
 import { useAuth } from "./context/AuthContext";
 import { C, S } from "./theme";
 import { AuthScreen } from "./screens/AuthScreen";
 import { ProjectDigitalizationModal } from "./components/ProjectDigitalizationModal";
+
+const APP_VERSION = "1.0.0";
 
 const MODULE_ICONS = {
   centers:   { uri: "https://img.icons8.com/color/96/hospital-3.png" },
@@ -43,6 +45,14 @@ export function Root() {
   const autoSelectedResponderTab = useRef(false);
   const pendingSyncCountRef = useRef(0);
   const syncNoticeTimeoutRef = useRef(null);
+
+  // Refresh & update state
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updateVersion, setUpdateVersion] = useState(null);
+  const [showAbout, setShowAbout] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const normalizeRoleValue = (value) => String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
   const normalizedRole = normalizeRoleValue(user?.role);
@@ -133,6 +143,22 @@ export function Root() {
     return () => { cancelled = true; clearInterval(interval); };
   }, [user, token, canManageCenters]);
 
+  // Check for app update on mount
+  useEffect(() => {
+    async function checkForUpdate() {
+      try {
+        const data = await apiFetch("/version", { token: null });
+        if (data?.version && data.version !== APP_VERSION) {
+          setUpdateAvailable(true);
+          setUpdateVersion(data.version);
+        }
+      } catch {
+        // ignore — offline or endpoint not available
+      }
+    }
+    checkForUpdate();
+  }, []);
+
   useEffect(() => {
     if (canManageCenters) {
       if (chefHasPendingOrMissingCenter) return;
@@ -158,6 +184,13 @@ export function Root() {
     }
   }, [canManageCenters, chefHasPendingOrMissingCenter, isEmergencyResponder, canSeeNearby, canComplain, currentTab]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setRefreshKey((k) => k + 1);
+    await new Promise((r) => setTimeout(r, 900));
+    setRefreshing(false);
+  };
+
   if (!ready) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -171,43 +204,43 @@ export function Root() {
   function renderCurrentScreen() {
     if (canSeeNearby && currentTab === "nearby") {
       const { NearbyScreen } = require("./screens/NearbyScreen");
-      return <NearbyScreen />;
+      return <NearbyScreen key={refreshKey} />;
     }
     if (canComplain && currentTab === "complaints") {
       const { ComplaintScreen } = require("./screens/ComplaintScreen");
-      return <ComplaintScreen hideHistory />;
+      return <ComplaintScreen key={refreshKey} hideHistory />;
     }
     if (canComplain && currentTab === "complaints_tracking") {
       const { ComplaintScreen } = require("./screens/ComplaintScreen");
-      return <ComplaintScreen hideForm />;
+      return <ComplaintScreen key={refreshKey} hideForm />;
     }
     if (currentTab === "chef") {
       const { ChefScreen } = require("./screens/ChefScreen");
-      return <ChefScreen />;
+      return <ChefScreen key={refreshKey} />;
     }
     if (currentTab === "alerts") {
       const { EmergencyOpsScreen } = require("./screens/EmergencyOpsScreen");
-      return <EmergencyOpsScreen />;
+      return <EmergencyOpsScreen key={refreshKey} />;
     }
     if (currentTab === "security_ops") {
       const { SecurityAlertOpsScreen } = require("./screens/SecurityAlertOpsScreen");
-      return <SecurityAlertOpsScreen />;
+      return <SecurityAlertOpsScreen key={refreshKey} />;
     }
     if (currentTab === "emergency") {
       const { EmergencyScreen } = require("./screens/EmergencyScreen");
-      return <EmergencyScreen />;
+      return <EmergencyScreen key={refreshKey} />;
     }
     if (currentTab === "security_alert") {
       const { SecurityAlertScreen } = require("./screens/SecurityAlertScreen");
-      return <SecurityAlertScreen />;
+      return <SecurityAlertScreen key={refreshKey} />;
     }
     if (currentTab === "settings") {
       const { CenterSettingsScreen } = require("./screens/CenterSettingsScreen");
-      return <CenterSettingsScreen />;
+      return <CenterSettingsScreen key={refreshKey} />;
     }
     if (currentTab === "contact_developer") {
       const { ContactDeveloperScreen } = require("./screens/ContactDeveloperScreen");
-      return <ContactDeveloperScreen />;
+      return <ContactDeveloperScreen key={refreshKey} />;
     }
     return null;
   }
@@ -246,6 +279,14 @@ export function Root() {
               <Text style={styles.moduleLabelText} numberOfLines={1}>{activeTab.label}</Text>
             </View>
           ) : null}
+          {/* Refresh button */}
+          <Pressable
+            style={styles.refreshBtn}
+            onPress={handleRefresh}
+            accessibilityLabel="Actualiser"
+          >
+            <Text style={[styles.refreshBtnText, refreshing && styles.refreshBtnTextSpinning]}>↻</Text>
+          </Pressable>
           <Pressable style={styles.menuBtn} onPress={() => setMenuOpen(true)} accessibilityLabel="Menu">
             <View style={styles.hamburger}>
               <View style={styles.hamburgerLine} />
@@ -311,7 +352,7 @@ export function Root() {
                 <View style={styles.supportModuleCard}>
                   <View style={styles.supportModuleHeader}>
                     <Text style={styles.supportModuleTitle}>Support & projet</Text>
-                    <Text style={styles.supportModuleHint}>Choisissez l’action que vous voulez lancer</Text>
+                    <Text style={styles.supportModuleHint}>Choisissez l'action que vous voulez lancer</Text>
                   </View>
 
                   <View style={styles.supportModuleBody}>
@@ -344,6 +385,38 @@ export function Root() {
                         <Text style={styles.supportActionSubLight}>Cliquez ici et parlez-en a YEFA</Text>
                       </View>
                     </Pressable>
+
+                    {/* A propos */}
+                    <Pressable
+                      style={[styles.supportActionBtn, { backgroundColor: C.primaryLight }]}
+                      onPress={() => {
+                        setSupportActionsOpen(false);
+                        setMenuOpen(false);
+                        setShowAbout(true);
+                      }}
+                    >
+                      <Text style={styles.supportActionIconText}>ℹ️</Text>
+                      <View style={styles.supportActionTextWrap}>
+                        <Text style={[styles.supportActionTitleDark, { color: C.primaryDark }]}>A propos de l'application</Text>
+                        <Text style={[styles.supportActionSubDark, { color: C.primary }]}>Version {APP_VERSION} — Sante et Securite a Proximite</Text>
+                      </View>
+                    </Pressable>
+
+                    {/* Aide */}
+                    <Pressable
+                      style={[styles.supportActionBtn, { backgroundColor: C.tealLight }]}
+                      onPress={() => {
+                        setSupportActionsOpen(false);
+                        setMenuOpen(false);
+                        setShowHelp(true);
+                      }}
+                    >
+                      <Text style={styles.supportActionIconText}>❓</Text>
+                      <View style={styles.supportActionTextWrap}>
+                        <Text style={[styles.supportActionTitleDark, { color: C.teal }]}>Aide & FAQ</Text>
+                        <Text style={[styles.supportActionSubDark, { color: C.teal }]}>Comment utiliser l'application</Text>
+                      </View>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -367,6 +440,18 @@ export function Root() {
 
       {/* Content */}
       <View style={styles.content}>
+        {/* Update banner */}
+        {updateAvailable ? (
+          <Pressable
+            style={styles.updateBanner}
+            onPress={() => Linking.openURL("https://play.google.com/store/apps/details?id=com.yefa.sante")}
+          >
+            <Text style={styles.updateBannerText}>
+              🚀 Mise a jour disponible (v{updateVersion}) — Appuyez pour mettre a jour
+            </Text>
+          </Pressable>
+        ) : null}
+
         {syncNotice ? (
           <View
             style={[
@@ -384,7 +469,25 @@ export function Root() {
             </Text>
           </View>
         ) : null}
-        {renderCurrentScreen()}
+
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flex: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[C.primary]}
+              tintColor={C.primary}
+              title="Actualisation..."
+              titleColor={C.textMuted}
+            />
+          }
+          scrollEnabled={false}
+          nestedScrollEnabled
+        >
+          {renderCurrentScreen()}
+        </ScrollView>
       </View>
 
       <View style={styles.footer}>
@@ -396,6 +499,152 @@ export function Root() {
     yefa.technologie@gmail.com
   </Text>
       </View>
+
+      {/* A propos modal */}
+      <Modal visible={showAbout} transparent animationType="slide" onRequestClose={() => setShowAbout(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>A propos</Text>
+              <Pressable style={styles.drawerCloseBtn} onPress={() => setShowAbout(false)}>
+                <Text style={styles.drawerCloseBtnText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              <View style={styles.aboutLogoWrap}>
+                <Image source={require("../assets/logo-sante.png")} style={styles.aboutLogo} resizeMode="contain" />
+              </View>
+
+              <Text style={styles.aboutAppName}>Sante et Securite a Proximite</Text>
+              <Text style={styles.aboutVersion}>Version {APP_VERSION}</Text>
+
+              <View style={styles.aboutDivider} />
+
+              <Text style={styles.aboutSectionTitle}>Description</Text>
+              <Text style={styles.aboutText}>
+                Sante et Securite a Proximite est une application mobile permettant aux citoyens de localiser facilement les centres de sante et services d'urgence a proximite, de soumettre des plaintes, et de signaler des situations d'urgence sanitaire ou securitaire en temps reel.
+              </Text>
+
+              <View style={styles.aboutDivider} />
+
+              <Text style={styles.aboutSectionTitle}>Fonctionnalites</Text>
+              {[
+                "Localisation des centres de sante les plus proches",
+                "Soumission et suivi de plaintes",
+                "Signalement d'urgences sanitaires et securitaires",
+                "Interface dediee aux professionnels de sante",
+                "Coordination SAMU, pompiers et forces de l'ordre",
+                "Fonctionnement hors ligne avec synchronisation automatique",
+              ].map((f, i) => (
+                <View key={i} style={styles.aboutFeatureRow}>
+                  <Text style={styles.aboutFeatureDot}>•</Text>
+                  <Text style={styles.aboutFeatureText}>{f}</Text>
+                </View>
+              ))}
+
+              <View style={styles.aboutDivider} />
+
+              <Text style={styles.aboutSectionTitle}>Developpeur</Text>
+              <Text style={styles.aboutText}>YEFA TECHNOLOGIE</Text>
+              <Pressable onPress={() => Linking.openURL("mailto:yefa.technologie@gmail.com")}>
+                <Text style={[styles.aboutText, { color: C.primary, fontWeight: "700", marginTop: 4 }]}>
+                  yefa.technologie@gmail.com
+                </Text>
+              </Pressable>
+
+              <View style={styles.aboutDivider} />
+
+              <View style={styles.aboutVersionRow}>
+                <Text style={styles.aboutVersionLabel}>Version de l'application</Text>
+                <Text style={styles.aboutVersionValue}>{APP_VERSION}</Text>
+              </View>
+              {updateAvailable ? (
+                <Pressable
+                  style={[styles.aboutUpdateBtn]}
+                  onPress={() => Linking.openURL("https://play.google.com/store/apps/details?id=com.yefa.sante")}
+                >
+                  <Text style={styles.aboutUpdateBtnText}>Mise a jour disponible : v{updateVersion} — Mettre a jour</Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.aboutUpToDate}>✓ Application a jour</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Aide modal */}
+      <Modal visible={showHelp} transparent animationType="slide" onRequestClose={() => setShowHelp(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Aide & FAQ</Text>
+              <Pressable style={styles.drawerCloseBtn} onPress={() => setShowHelp(false)}>
+                <Text style={styles.drawerCloseBtnText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {[
+                {
+                  q: "Comment trouver un centre de sante proche ?",
+                  a: "Depuis l'ecran principal, l'application detecte votre position et affiche les centres de sante les plus proches sur la carte. Vous pouvez filtrer par type d'etablissement ou ajuster le rayon de recherche.",
+                },
+                {
+                  q: "Comment actualiser les donnees ?",
+                  a: "Faites glisser l'ecran vers le bas (tirer vers le bas) pour actualiser, ou appuyez sur le bouton ↻ en haut a droite de l'application.",
+                },
+                {
+                  q: "Comment soumettre une plainte ?",
+                  a: "Allez dans la section 'Poser une plainte', selectionnez le centre concerne, decrivez le probleme et soumettez. Vous pouvez suivre l'etat de vos plaintes dans 'Suivi des plaintes'.",
+                },
+                {
+                  q: "Comment signaler une urgence sanitaire ?",
+                  a: "Appuyez sur 'Urgence sanitaire' dans le menu. Remplissez le formulaire avec votre localisation et la description de l'urgence. Le SAMU ou les pompiers seront alertes.",
+                },
+                {
+                  q: "Comment signaler une urgence securitaire ?",
+                  a: "Appuyez sur 'Urgence securitaire'. Decrivez la situation et soumettez. La police ou la gendarmerie recevra l'alerte.",
+                },
+                {
+                  q: "L'application fonctionne-t-elle sans connexion ?",
+                  a: "Oui. Les actions effectuees hors ligne sont enregistrees localement et synchronisees automatiquement des que la connexion est retablie. Une notification vous informe de l'etat de la synchronisation.",
+                },
+                {
+                  q: "Comment mettre a jour l'application ?",
+                  a: "Si une mise a jour est disponible, une banniere s'affiche en haut de l'ecran. Appuyez dessus pour acceder a la mise a jour. Vous pouvez aussi verifier dans 'A propos' dans le menu Support.",
+                },
+                {
+                  q: "Je suis chef d'etablissement, comment gerer mon centre ?",
+                  a: "Connectez-vous avec votre compte chef. L'application vous redirige automatiquement vers 'Espace chef' ou vous pouvez gerer les informations de votre etablissement, suivre les plaintes et les services.",
+                },
+                {
+                  q: "Comment contacter le support ?",
+                  a: "Dans le menu (icone hamburger en haut a droite), allez dans 'Support & projet' puis 'Contacter le developpeur'. Vous pouvez aussi ecrire directement a yefa.technologie@gmail.com.",
+                },
+              ].map((item, i) => (
+                <View key={i} style={styles.faqItem}>
+                  <Text style={styles.faqQuestion}>{item.q}</Text>
+                  <Text style={styles.faqAnswer}>{item.a}</Text>
+                </View>
+              ))}
+
+              <View style={styles.aboutDivider} />
+              <Text style={styles.helpContact}>
+                Vous n'avez pas trouve votre reponse ?{"\n"}
+                Contactez-nous a{" "}
+                <Text
+                  style={{ color: C.primary, fontWeight: "700" }}
+                  onPress={() => Linking.openURL("mailto:yefa.technologie@gmail.com")}
+                >
+                  yefa.technologie@gmail.com
+                </Text>
+              </Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -431,6 +680,9 @@ const styles = StyleSheet.create({
     maxWidth: 120,
   },
   moduleLabelText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  refreshBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  refreshBtnText: { color: "#FFFFFF", fontSize: 20, fontWeight: "700" },
+  refreshBtnTextSpinning: { opacity: 0.5 },
   menuBtn:     { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
   hamburger:   { gap: 5, alignItems: "center" },
   hamburgerLine: { width: 18, height: 2, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.9)" },
@@ -525,9 +777,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  supportModuleBody: {
-    gap: 10,
-  },
+  supportModuleBody: { gap: 10 },
   supportActionBtn: {
     borderRadius: 16,
     paddingHorizontal: 14,
@@ -537,18 +787,15 @@ const styles = StyleSheet.create({
     gap: 12,
     ...S.sm,
   },
-  supportActionBtnYellow: {
-    backgroundColor: "#FACC15",
-  },
-  supportActionBtnRed: {
-    backgroundColor: "#DC2626",
-  },
-  supportActionIcon: { width: 28, height: 28 },
-  supportActionTextWrap: { flex: 1, minWidth: 0 },
+  supportActionBtnYellow: { backgroundColor: "#FACC15" },
+  supportActionBtnRed:    { backgroundColor: "#DC2626" },
+  supportActionIcon:      { width: 28, height: 28 },
+  supportActionIconText:  { fontSize: 24 },
+  supportActionTextWrap:  { flex: 1, minWidth: 0 },
   supportActionTitleDark: { color: "#1F2937", fontWeight: "900", fontSize: 16 },
-  supportActionSubDark: { color: "#4B5563", fontSize: 12, marginTop: 3, fontWeight: "600" },
+  supportActionSubDark:   { color: "#4B5563", fontSize: 12, marginTop: 3, fontWeight: "600" },
   supportActionTitleLight: { color: "#FFFFFF", fontWeight: "900", fontSize: 15 },
-  supportActionSubLight: { color: "rgba(255,255,255,0.88)", fontSize: 12, marginTop: 3, fontWeight: "600" },
+  supportActionSubLight:   { color: "rgba(255,255,255,0.88)", fontSize: 12, marginTop: 3, fontWeight: "600" },
 
   logoutBtn: {
     backgroundColor: C.redLight,
@@ -561,6 +808,25 @@ const styles = StyleSheet.create({
   logoutBtnText: { color: C.red, fontWeight: "700", fontSize: 15 },
 
   content: { flex: 1, marginTop: 10 },
+
+  // Update banner
+  updateBanner: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    backgroundColor: C.primaryDark,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    ...S.sm,
+  },
+  updateBannerText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+
   syncNotice: {
     marginHorizontal: 12,
     marginBottom: 8,
@@ -569,21 +835,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  syncNoticeWarning: {
-    backgroundColor: C.amberLight,
-    borderColor: C.amber,
-  },
-  syncNoticeSuccess: {
-    backgroundColor: C.greenLight,
-    borderColor: C.green,
-  },
-  syncNoticeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
+  syncNoticeWarning: { backgroundColor: C.amberLight, borderColor: C.amber },
+  syncNoticeSuccess: { backgroundColor: C.greenLight, borderColor: C.green },
+  syncNoticeText:    { fontSize: 12, fontWeight: "700", textAlign: "center" },
   syncNoticeTextWarning: { color: C.amber },
   syncNoticeTextSuccess: { color: C.green },
+
   footer: {
     paddingVertical: 10,
     alignItems: "center",
@@ -592,4 +849,65 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
   },
   footerText: { color: C.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
+
+  // Generic modal sheet
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.55)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
+    maxHeight: "90%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  modalTitle: { fontSize: 20, fontWeight: "800", color: C.textDark },
+
+  // About
+  aboutLogoWrap:   { alignItems: "center", marginBottom: 12 },
+  aboutLogo:       { width: 80, height: 80, borderRadius: 20 },
+  aboutAppName:    { fontSize: 18, fontWeight: "800", color: C.textDark, textAlign: "center" },
+  aboutVersion:    { fontSize: 13, color: C.textMuted, fontWeight: "600", textAlign: "center", marginTop: 4, marginBottom: 4 },
+  aboutDivider:    { height: 1, backgroundColor: C.border, marginVertical: 16 },
+  aboutSectionTitle: { fontSize: 13, fontWeight: "800", color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 },
+  aboutText:       { fontSize: 14, color: C.textMed, lineHeight: 22 },
+  aboutFeatureRow: { flexDirection: "row", gap: 8, marginBottom: 6 },
+  aboutFeatureDot: { color: C.primary, fontWeight: "900", fontSize: 16, lineHeight: 22 },
+  aboutFeatureText:{ fontSize: 14, color: C.textMed, flex: 1, lineHeight: 22 },
+  aboutVersionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  aboutVersionLabel: { fontSize: 14, color: C.textMuted, fontWeight: "600" },
+  aboutVersionValue: { fontSize: 14, color: C.textDark, fontWeight: "700" },
+  aboutUpdateBtn: {
+    backgroundColor: C.primary,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    ...S.sm,
+  },
+  aboutUpdateBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+  aboutUpToDate: { color: C.green, fontWeight: "700", fontSize: 14, textAlign: "center", paddingVertical: 10 },
+
+  // Help / FAQ
+  faqItem: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 14,
+    marginBottom: 10,
+    ...S.sm,
+  },
+  faqQuestion: { fontSize: 14, fontWeight: "800", color: C.textDark, marginBottom: 6 },
+  faqAnswer:   { fontSize: 13, color: C.textMed, lineHeight: 20 },
+  helpContact: { fontSize: 13, color: C.textMuted, textAlign: "center", lineHeight: 22 },
 });
