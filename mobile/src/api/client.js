@@ -174,6 +174,18 @@ async function enqueueOfflineRequest(path, { token, method, body }) {
   await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
 }
 
+export async function clearLocalCache() {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const appKeys = allKeys.filter(
+      (k) =>
+        k.startsWith("sante_aproxmite_") ||
+        k.startsWith(CACHE_PREFIX)
+    );
+    if (appKeys.length) await AsyncStorage.multiRemove(appKeys);
+  } catch {}
+}
+
 export async function getPendingRequests() {
   const raw = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
   return raw ? JSON.parse(raw) : [];

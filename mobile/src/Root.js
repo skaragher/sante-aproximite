@@ -1,6 +1,6 @@
 import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import { apiFetch, getPendingRequestsCount, syncPendingRequests } from "./api/client";
+import { apiFetch, clearLocalCache, getPendingRequestsCount, syncPendingRequests } from "./api/client";
 import { useAuth } from "./context/AuthContext";
 import { C, S } from "./theme";
 import { AuthScreen } from "./screens/AuthScreen";
@@ -53,6 +53,7 @@ export function Root() {
   const [updateVersion, setUpdateVersion] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [clearingCache, setClearingCache] = useState(false);
 
   const normalizeRoleValue = (value) => String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
   const normalizedRole = normalizeRoleValue(user?.role);
@@ -189,6 +190,14 @@ export function Root() {
     setRefreshKey((k) => k + 1);
     await new Promise((r) => setTimeout(r, 900));
     setRefreshing(false);
+  };
+
+  const handleClearCache = async () => {
+    setClearingCache(true);
+    await clearLocalCache();
+    await new Promise((r) => setTimeout(r, 600));
+    setClearingCache(false);
+    setRefreshKey((k) => k + 1);
   };
 
   if (!ready) {
@@ -417,6 +426,27 @@ export function Root() {
                         <Text style={[styles.supportActionSubDark, { color: C.teal }]}>Comment utiliser l'application</Text>
                       </View>
                     </Pressable>
+
+                    {/* Vider le cache */}
+                    <Pressable
+                      style={[styles.supportActionBtn, { backgroundColor: C.amberLight, opacity: clearingCache ? 0.6 : 1 }]}
+                      onPress={async () => {
+                        setSupportActionsOpen(false);
+                        setMenuOpen(false);
+                        await handleClearCache();
+                      }}
+                      disabled={clearingCache}
+                    >
+                      <Text style={styles.supportActionIconText}>🗑️</Text>
+                      <View style={styles.supportActionTextWrap}>
+                        <Text style={[styles.supportActionTitleDark, { color: C.amber }]}>
+                          {clearingCache ? "Nettoyage en cours..." : "Vider le cache local"}
+                        </Text>
+                        <Text style={[styles.supportActionSubDark, { color: C.amber }]}>
+                          Libere l'espace si l'appli est lente ou bloquee
+                        </Text>
+                      </View>
+                    </Pressable>
                   </View>
                 </View>
 
@@ -569,6 +599,24 @@ export function Root() {
               ) : (
                 <Text style={styles.aboutUpToDate}>✓ Application a jour</Text>
               )}
+
+              <View style={styles.aboutDivider} />
+
+              <Pressable
+                style={[styles.aboutUpdateBtn, { backgroundColor: C.amber, opacity: clearingCache ? 0.6 : 1 }]}
+                onPress={async () => {
+                  await handleClearCache();
+                  setShowAbout(false);
+                }}
+                disabled={clearingCache}
+              >
+                <Text style={styles.aboutUpdateBtnText}>
+                  {clearingCache ? "Nettoyage en cours..." : "🗑️  Vider le cache local"}
+                </Text>
+              </Pressable>
+              <Text style={[styles.helpContact, { marginTop: 8 }]}>
+                Vider le cache libere l'espace disque si l'application est lente ou affiche des erreurs de stockage.
+              </Text>
             </ScrollView>
           </View>
         </View>

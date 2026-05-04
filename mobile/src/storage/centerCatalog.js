@@ -71,11 +71,33 @@ async function readCatalog(token) {
   }
 }
 
+async function clearAppCache() {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const appKeys = allKeys.filter(
+      (k) => k.startsWith("sante_aproxmite_") || k.startsWith("sante_aproxmite_cache_")
+    );
+    if (appKeys.length) await AsyncStorage.multiRemove(appKeys);
+  } catch {}
+}
+
 async function writeCatalog(token, centers) {
-  await AsyncStorage.setItem(
-    getCatalogKey(token),
-    JSON.stringify(Array.isArray(centers) ? centers.map(sanitizeCenter) : [])
-  );
+  const payload = JSON.stringify(Array.isArray(centers) ? centers.map(sanitizeCenter) : []);
+  try {
+    await AsyncStorage.setItem(getCatalogKey(token), payload);
+  } catch (err) {
+    const isFull =
+      String(err?.message || "").toLowerCase().includes("sqlite_full") ||
+      String(err?.message || "").toLowerCase().includes("database or disk is full") ||
+      err?.code === 13;
+    if (isFull) {
+      // Clear stale cache then retry once
+      await clearAppCache();
+      await AsyncStorage.setItem(getCatalogKey(token), payload);
+    } else {
+      throw err;
+    }
+  }
 }
 
 async function getMetaValue(key) {
