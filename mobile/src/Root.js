@@ -310,6 +310,7 @@ export function Root() {
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <Pressable style={styles.overlay} onPress={() => setMenuOpen(false)}>
           <Pressable style={styles.drawer} onPress={() => {}}>
+            {/* Fixed header — never scrolls */}
             <View style={styles.drawerHeader}>
               <View style={styles.drawerUserRow}>
                 <View style={styles.drawerAvatar}>
@@ -326,6 +327,13 @@ export function Root() {
             </View>
 
             <View style={styles.drawerDivider} />
+
+            {/* Scrollable body */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 8 }}
+              keyboardShouldPersistTaps="handled"
+            >
 
             <View style={styles.moduleGrid}>
               {tabs.map((tab) => {
@@ -456,6 +464,9 @@ export function Root() {
               <View style={styles.drawerDivider} />
             )}
 
+            </ScrollView>
+
+            {/* Fixed footer — always visible */}
             <Pressable
               style={styles.logoutBtn}
               onPress={() => { setMenuOpen(false); logout(); }}
