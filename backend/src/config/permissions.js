@@ -51,6 +51,12 @@ export const ALL_PERMISSIONS = [
   { key: "IMPORT_GEO",            section: "GÉOGRAPHIE",           label: "Importer des données géographiques",      desc: "Importer des régions ou districts depuis un fichier Excel/CSV" },
   { key: "EXPORT_GEO",            section: "GÉOGRAPHIE",           label: "Exporter les données géographiques",      desc: "Télécharger les régions, districts ou ESPC au format CSV" },
 
+  // ── STATISTIQUES ──────────────────────────────────────────────────────────
+  { key: "VIEW_STATS_USAGE",      section: "STATISTIQUES",         label: "Voir le taux d'utilisation",              desc: "Accéder aux statistiques d'utilisation de l'application par les centres de santé" },
+  { key: "VIEW_STATS_COMPLAINTS", section: "STATISTIQUES",         label: "Voir les statistiques de plaintes",       desc: "Consulter le nombre et les taux de traitement des plaintes soumises" },
+  { key: "VIEW_STATS_EMERGENCY",  section: "STATISTIQUES",         label: "Voir les statistiques d'urgences sanitaires", desc: "Consulter les urgences sanitaires signalées et leur taux de prise en charge" },
+  { key: "VIEW_STATS_SECURITY",   section: "STATISTIQUES",         label: "Voir les statistiques d'urgences sécuritaires", desc: "Consulter les alertes sécuritaires signalées et leur taux de résolution" },
+
   // ── ADMINISTRATION ────────────────────────────────────────────────────────
   { key: "MANAGE_RBAC",           section: "ADMINISTRATION",       label: "Gérer les rôles personnalisés (RBAC)",    desc: "Créer, modifier et supprimer des rôles RBAC personnalisés" },
   { key: "ASSIGN_RBAC_ROLES",     section: "ADMINISTRATION",       label: "Attribuer des rôles personnalisés",       desc: "Assigner des rôles RBAC personnalisés à des utilisateurs" },
@@ -65,6 +71,7 @@ export const DEFAULT_PERMISSIONS = {
     "VIEW_ADMIN_USERS", "VIEW_PUBLIC_USERS", "CREATE_USER", "EDIT_USER", "DELETE_USER", "TOGGLE_USER_ACTIVE", "RESET_USER_PASSWORD", "APPROVE_CHEF",
     "VIEW_COMPLAINTS", "MANAGE_COMPLAINTS", "ADD_COMPLAINT_NOTE", "VIEW_EVALUATIONS",
     "VIEW_GEO", "MANAGE_GEO", "IMPORT_CENTERS", "IMPORT_GEO", "EXPORT_GEO",
+    "VIEW_STATS_USAGE", "VIEW_STATS_COMPLAINTS", "VIEW_STATS_EMERGENCY", "VIEW_STATS_SECURITY",
     "MANAGE_RBAC", "ASSIGN_RBAC_ROLES", "ACCESS_IMPORTS", "ACCESS_ROLES",
   ],
   REGULATOR: [
@@ -73,6 +80,7 @@ export const DEFAULT_PERMISSIONS = {
     "VIEW_ADMIN_USERS", "VIEW_PUBLIC_USERS", "CREATE_USER", "EDIT_USER", "DELETE_USER", "TOGGLE_USER_ACTIVE", "RESET_USER_PASSWORD", "APPROVE_CHEF",
     "VIEW_COMPLAINTS", "MANAGE_COMPLAINTS", "ADD_COMPLAINT_NOTE", "VIEW_EVALUATIONS",
     "VIEW_GEO", "MANAGE_GEO", "IMPORT_CENTERS", "IMPORT_GEO", "EXPORT_GEO",
+    "VIEW_STATS_USAGE", "VIEW_STATS_COMPLAINTS", "VIEW_STATS_EMERGENCY", "VIEW_STATS_SECURITY",
     "ASSIGN_RBAC_ROLES", "ACCESS_IMPORTS", "ACCESS_ROLES",
   ],
   REGION: [

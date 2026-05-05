@@ -69,17 +69,32 @@
             </div>
           </div>
 
-          <!-- Badges de permissions -->
-          <div class="rbac-perm-tags" v-if="role.permissions.length > 0">
-            <span
-              v-for="pkey in role.permissions.slice(0, 8)"
-              :key="pkey"
-              class="rbac-perm-tag"
-              :title="labelForPerm(pkey)"
-            >{{ labelForPerm(pkey) }}</span>
-            <span v-if="role.permissions.length > 8" class="rbac-perm-tag rbac-perm-more">
-              +{{ role.permissions.length - 8 }} autres
-            </span>
+          <!-- Permissions groupées et dépliantes -->
+          <div v-if="role.permissions.length > 0" class="rbac-perm-groups">
+            <div
+              v-for="grp in groupedPermsForRole(role)"
+              :key="grp.section"
+              class="rbac-perm-group"
+            >
+              <button
+                class="rbac-perm-group-header"
+                :style="`border-left-color:${grp.color};color:${grp.color}`"
+                @click="toggleCardSection(role.id, grp.section)"
+                type="button"
+              >
+                <span class="rbac-perm-group-name">{{ grp.section }}</span>
+                <span class="rbac-perm-group-count">{{ grp.items.length }}</span>
+                <span class="rbac-perm-group-arrow" :class="{ open: !isCardSectionCollapsed(role.id, grp.section) }">▾</span>
+              </button>
+              <div class="rbac-perm-tags rbac-perm-tags--grouped" v-show="!isCardSectionCollapsed(role.id, grp.section)">
+                <span
+                  v-for="pkey in grp.items"
+                  :key="pkey"
+                  class="rbac-perm-tag"
+                  :title="labelForPerm(pkey)"
+                >{{ labelForPerm(pkey) }}</span>
+              </div>
+            </div>
           </div>
           <div class="rbac-perm-tags" v-else>
             <span class="rbac-perm-tag rbac-perm-empty">Aucune permission assignée</span>
@@ -354,6 +369,30 @@ function labelForPerm(key) {
   return found?.label || key;
 }
 
+function groupedPermsForRole(role) {
+  const groups = {};
+  for (const pkey of role.permissions) {
+    const found = store.rbacPermissions.find((p) => p.key === pkey);
+    const section = found?.section || "AUTRES";
+    const color = SECTION_COLORS[section] || "#64748b";
+    if (!groups[section]) groups[section] = { section, color, items: [] };
+    groups[section].items.push(pkey);
+  }
+  return Object.values(groups);
+}
+
+const cardCollapsedSections = ref({});
+function toggleCardSection(roleId, section) {
+  const key = `${roleId}::${section}`;
+  cardCollapsedSections.value = {
+    ...cardCollapsedSections.value,
+    [key]: !cardCollapsedSections.value[key],
+  };
+}
+function isCardSectionCollapsed(roleId, section) {
+  return !!cardCollapsedSections.value[`${roleId}::${section}`];
+}
+
 // ─── Matrice de référence ─────────────────────────────────────────────────────
 const ROLES = [
   { key: "NATIONAL",          label: "National",          icon: "👑", color: "#7c3aed", desc: "Super admin - accès total" },
@@ -547,6 +586,27 @@ async function doDelete() {
 .rbac-btn-edit { font-size: 0.78rem; padding: 5px 12px; }
 .rbac-btn-users { font-size: 0.78rem; padding: 5px 12px; }
 .rbac-btn-delete { font-size: 0.78rem; padding: 5px 10px; color: #dc2626 !important; border-color: #fecaca !important; }
+
+/* ── Permission grouped in cards ── */
+.rbac-perm-groups { display: flex; flex-direction: column; gap: 4px; }
+.rbac-perm-group { border-radius: 8px; overflow: hidden; border: 1px solid #f1f5f9; }
+.rbac-perm-group-header {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; background: #f8fafc; border: none;
+  border-left: 3px solid; cursor: pointer; text-align: left;
+  font-size: 0.72rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  transition: background .12s;
+}
+.rbac-perm-group-header:hover { background: #f1f5f9; }
+.rbac-perm-group-name { flex: 1; }
+.rbac-perm-group-count {
+  background: currentColor; color: #fff; border-radius: 20px;
+  padding: 1px 6px; font-size: 0.68rem; opacity: 0.8;
+}
+.rbac-perm-group-arrow { font-size: 0.8rem; transition: transform .2s; }
+.rbac-perm-group-arrow.open { transform: rotate(0deg); }
+.rbac-perm-group-arrow:not(.open) { transform: rotate(-90deg); }
+.rbac-perm-tags--grouped { padding: 6px 8px; }
 
 /* ── Permission tags ── */
 .rbac-perm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
