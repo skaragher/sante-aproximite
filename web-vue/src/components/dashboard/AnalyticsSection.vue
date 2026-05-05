@@ -99,26 +99,31 @@
       <!-- Complaints stats -->
       <div class="section-card">
         <h3 class="section-title">📋 Plaintes soumises</h3>
-        <div class="kpi-grid-small">
-          <div class="kpi-sm kpi-sm-blue">
-            <div class="kpi-sm-val">{{ (data.complaintsStats?.total || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Total soumises</div>
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.complaintsStats?.total || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Total soumises</div>
+            <div class="kpi-sub">{{ period }} jours</div>
           </div>
-          <div class="kpi-sm kpi-sm-gray">
-            <div class="kpi-sm-val">{{ (data.complaintsStats?.new || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">En attente</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.complaintsStats?.new || 0).toLocaleString() }}</div>
+            <div class="kpi-label">En attente</div>
+            <div class="kpi-sub">non traitées</div>
           </div>
-          <div class="kpi-sm kpi-sm-orange">
-            <div class="kpi-sm-val">{{ (data.complaintsStats?.inProgress || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">En traitement</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.complaintsStats?.inProgress || 0).toLocaleString() }}</div>
+            <div class="kpi-label">En traitement</div>
+            <div class="kpi-sub">en cours</div>
           </div>
-          <div class="kpi-sm kpi-sm-green">
-            <div class="kpi-sm-val">{{ (data.complaintsStats?.resolved || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Résolues</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.complaintsStats?.resolved || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Résolues</div>
+            <div class="kpi-sub">clôturées</div>
           </div>
-          <div class="kpi-sm kpi-sm-red">
-            <div class="kpi-sm-val">{{ (data.complaintsStats?.rejected || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Rejetées</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.complaintsStats?.rejected || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Rejetées</div>
+            <div class="kpi-sub">non retenues</div>
           </div>
         </div>
         <div class="status-bar-wrap" v-if="data.complaintsStats?.total">
@@ -138,22 +143,26 @@
       <!-- Emergency stats -->
       <div class="section-card">
         <h3 class="section-title">🚑 Urgences sanitaires signalées</h3>
-        <div class="kpi-grid-small">
-          <div class="kpi-sm kpi-sm-red">
-            <div class="kpi-sm-val">{{ (data.emergencyStats?.total || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Total envoyées</div>
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.emergencyStats?.total || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Total envoyées</div>
+            <div class="kpi-sub">{{ period }} jours</div>
           </div>
-          <div class="kpi-sm kpi-sm-gray">
-            <div class="kpi-sm-val">{{ (data.emergencyStats?.new || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">En attente</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.emergencyStats?.new || 0).toLocaleString() }}</div>
+            <div class="kpi-label">En attente</div>
+            <div class="kpi-sub">non prises en charge</div>
           </div>
-          <div class="kpi-sm kpi-sm-orange">
-            <div class="kpi-sm-val">{{ (data.emergencyStats?.inProgress || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">En cours</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.emergencyStats?.inProgress || 0).toLocaleString() }}</div>
+            <div class="kpi-label">En cours</div>
+            <div class="kpi-sub">en intervention</div>
           </div>
-          <div class="kpi-sm kpi-sm-green">
-            <div class="kpi-sm-val">{{ (data.emergencyStats?.resolved || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Clôturées</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.emergencyStats?.resolved || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Clôturées</div>
+            <div class="kpi-sub">terminées</div>
           </div>
         </div>
         <template v-if="data.emergencyStats?.byService?.length">
@@ -179,22 +188,26 @@
       <!-- Security alert stats -->
       <div class="section-card">
         <h3 class="section-title">🚨 Alertes sécuritaires signalées</h3>
-        <div class="kpi-grid-small">
-          <div class="kpi-sm kpi-sm-purple">
-            <div class="kpi-sm-val">{{ (data.securityStats?.total || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Total envoyées</div>
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.securityStats?.total || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Total envoyées</div>
+            <div class="kpi-sub">{{ period }} jours</div>
           </div>
-          <div class="kpi-sm kpi-sm-gray">
-            <div class="kpi-sm-val">{{ (data.securityStats?.new || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">En attente</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.securityStats?.new || 0).toLocaleString() }}</div>
+            <div class="kpi-label">En attente</div>
+            <div class="kpi-sub">non traitées</div>
           </div>
-          <div class="kpi-sm kpi-sm-orange">
-            <div class="kpi-sm-val">{{ (data.securityStats?.inProgress || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Prises en compte</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.securityStats?.inProgress || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Prises en compte</div>
+            <div class="kpi-sub">en cours</div>
           </div>
-          <div class="kpi-sm kpi-sm-green">
-            <div class="kpi-sm-val">{{ (data.securityStats?.resolved || 0).toLocaleString() }}</div>
-            <div class="kpi-sm-label">Résolues/Clôturées</div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ (data.securityStats?.resolved || 0).toLocaleString() }}</div>
+            <div class="kpi-label">Résolues / Clôturées</div>
+            <div class="kpi-sub">terminées</div>
           </div>
         </div>
         <template v-if="data.securityStats?.byService?.length">
