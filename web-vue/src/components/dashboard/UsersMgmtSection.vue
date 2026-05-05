@@ -62,16 +62,16 @@
 
             <td class="um-cell-scope">
               <div v-if="user.centerName" class="um-scope-line">
-                <span class="um-chip um-chip-ste">Ste</span>
+                <span class="um-chip um-chip-ste">Centre</span>
                 <span class="um-scope-text">{{ user.centerName }}</span>
               </div>
               <div v-if="user.districtCode" class="um-scope-line">
-                <span class="um-chip um-chip-dir">Dir</span>
-                <span class="um-scope-text">{{ user.districtCode }}</span>
+                <span class="um-chip um-chip-dir">District</span>
+                <span class="um-scope-text">{{ districtName(user.districtCode) }}</span>
               </div>
               <div v-else-if="user.regionCode" class="um-scope-line">
-                <span class="um-chip um-chip-reg">Rég</span>
-                <span class="um-scope-text">{{ user.regionCode }}</span>
+                <span class="um-chip um-chip-reg">Région</span>
+                <span class="um-scope-text">{{ regionName(user.regionCode) }}</span>
               </div>
               <span v-if="!user.centerName && !user.districtCode && !user.regionCode" class="um-scope-none">-</span>
             </td>
@@ -291,6 +291,17 @@ const localError = ref("");
 const localSuccess = ref("");
 const expandedUserId = ref(null);
 const expandedRolesId = ref(null);
+
+function regionName(code) {
+  if (!code) return code;
+  const match = store.regions?.find(r => String(r.code).toUpperCase() === String(code).toUpperCase());
+  return match?.name || code;
+}
+function districtName(code) {
+  if (!code) return code;
+  const match = store.districts?.find(d => String(d.code).toUpperCase() === String(code).toUpperCase());
+  return match?.name || code;
+}
 function showErr(msg) { localError.value = msg; setTimeout(() => { localError.value = ""; }, 4500); }
 function showOk(msg) { localSuccess.value = msg; setTimeout(() => { localSuccess.value = ""; }, 3000); }
 
