@@ -85,13 +85,21 @@
               </template>
               <template v-else>
                 <div class="um-roles-wrap">
-                  <button
-                    class="um-roles-toggle"
-                    :class="{ active: expandedRolesId === user.id }"
-                    @click="expandedRolesId = expandedRolesId === user.id ? null : user.id"
-                  >
-                    🏷 Rôles ({{ getLocalRoles(user.id).length }}) ▾
-                  </button>
+                  <!-- Badges des rôles actifs + bouton modifier -->
+                  <div class="um-active-roles">
+                    <span
+                      v-for="r in getLocalRoles(user.id)"
+                      :key="r"
+                      class="um-role-badge"
+                    >{{ visibleRoles.find(x => x.value === r)?.label || r }}</span>
+                    <button
+                      class="um-roles-edit-btn"
+                      :class="{ active: expandedRolesId === user.id }"
+                      @click="expandedRolesId = expandedRolesId === user.id ? null : user.id"
+                      title="Modifier les rôles"
+                    >✏</button>
+                  </div>
+                  <!-- Éditeur déroulant -->
                   <div v-if="expandedRolesId === user.id" class="um-roles-dropdown">
                     <div class="um-listbox">
                       <div
@@ -710,13 +718,18 @@ onMounted(async () => {
 .um-cell-status { white-space: nowrap; }
 .um-cell-scope { font-size: 0.8rem; min-width: 170px; }
 .um-cell-roles { min-width: 140px; }
-.um-roles-wrap { position: relative; display: inline-block; }
-.um-roles-toggle {
-  background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1;
-  border-radius: 8px; padding: 6px 12px;
-  font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+.um-roles-wrap { position: relative; }
+.um-active-roles { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.um-role-badge {
+  background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
+  border-radius: 20px; padding: 2px 8px; font-size: 0.72rem; font-weight: 700;
 }
-.um-roles-toggle.active { background: #EFF6FF; border-color: #1A56DB; color: #1A56DB; }
+.um-roles-edit-btn {
+  background: #F1F5F9; color: #64748B; border: 1px solid #CBD5E1;
+  border-radius: 6px; padding: 2px 7px; font-size: 0.75rem;
+  cursor: pointer; flex-shrink: 0;
+}
+.um-roles-edit-btn.active { background: #EFF6FF; border-color: #1A56DB; color: #1A56DB; }
 .um-roles-dropdown {
   position: absolute; left: 0; top: calc(100% + 4px); z-index: 200;
   background: #fff; border: 1px solid #E2E8F0; border-radius: 12px;
