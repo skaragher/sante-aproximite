@@ -3,7 +3,7 @@
     <div class="analytics-header">
       <div>
         <h2 class="analytics-title">Statistiques d'utilisation</h2>
-        <p class="analytics-subtitle">Taux d'utilisation par module, fonction et profil utilisateur</p>
+        <p class="analytics-subtitle">Taux d'utilisation de l'application pour les centres de santé</p>
       </div>
       <div class="analytics-controls">
         <select v-model="period" class="period-select" @change="load">
@@ -23,163 +23,198 @@
       <!-- KPI cards -->
       <div class="kpi-grid">
         <div class="kpi-card kpi-blue">
-          <div class="kpi-value">{{ data.total.toLocaleString() }}</div>
-          <div class="kpi-label">Actions totales</div>
+          <div class="kpi-value">{{ formatRate(data.healthCenterAppUsage?.rate) }}</div>
+          <div class="kpi-label">Taux d'utilisation</div>
           <div class="kpi-sub">{{ period }} jours</div>
         </div>
         <div class="kpi-card kpi-teal">
-          <div class="kpi-value">{{ data.uniqueUsers.toLocaleString() }}</div>
-          <div class="kpi-label">Utilisateurs actifs</div>
-          <div class="kpi-sub">uniques</div>
+          <div class="kpi-value">{{ (data.healthCenterAppUsage?.activeOpeners || 0).toLocaleString() }}</div>
+          <div class="kpi-label">Centres actifs</div>
+          <div class="kpi-sub">ont ouvert l'application</div>
         </div>
         <div class="kpi-card kpi-green">
-          <div class="kpi-value">{{ data.publicVsPro.public.toLocaleString() }}</div>
-          <div class="kpi-label">Comptes publics</div>
-          <div class="kpi-sub">rôle USER</div>
+          <div class="kpi-value">{{ (data.healthCenterAppUsage?.eligibleUsers || 0).toLocaleString() }}</div>
+          <div class="kpi-label">Centres éligibles</div>
+          <div class="kpi-sub">comptes établissement actifs</div>
         </div>
         <div class="kpi-card kpi-purple">
-          <div class="kpi-value">{{ data.publicVsPro.pro.toLocaleString() }}</div>
-          <div class="kpi-label">Comptes professionnels</div>
-          <div class="kpi-sub">CHEF, SAMU, POLICE…</div>
+          <div class="kpi-value">{{ centerInactiveCount.toLocaleString() }}</div>
+          <div class="kpi-label">Centres inactifs</div>
+          <div class="kpi-sub">sans ouverture</div>
         </div>
       </div>
 
-      <!-- Public vs Pro bar -->
       <div class="section-card">
-        <h3 class="section-title">Répartition Public / Professionnel</h3>
+        <h3 class="section-title">Adoption de l'application par les centres de santé</h3>
         <div class="pub-pro-bar-wrap">
           <div
             class="pub-pro-bar pub-pro-bar--public"
-            :style="{ width: pubPct + '%' }"
-            :title="`Public : ${data.publicVsPro.public}`"
+            :style="{ width: centerUsagePct + '%' }"
+            :title="`Centres actifs : ${data.healthCenterAppUsage?.activeOpeners || 0}`"
           >
-            <span v-if="pubPct > 10">{{ pubPct }}% Public</span>
+            <span v-if="centerUsagePct > 10">{{ centerUsagePct }}% Actifs</span>
           </div>
           <div
             class="pub-pro-bar pub-pro-bar--pro"
-            :style="{ width: proPct + '%' }"
-            :title="`Professionnel : ${data.publicVsPro.pro}`"
+            :style="{ width: centerInactivePct + '%' }"
+            :title="`Centres inactifs : ${centerInactiveCount}`"
           >
-            <span v-if="proPct > 10">{{ proPct }}% Pro</span>
-          </div>
-          <div
-            v-if="anonPct > 0"
-            class="pub-pro-bar pub-pro-bar--anon"
-            :style="{ width: anonPct + '%' }"
-            :title="`Non identifié : ${data.publicVsPro.anon}`"
-          >
-            <span v-if="anonPct > 5">{{ anonPct }}%</span>
+            <span v-if="centerInactivePct > 10">{{ centerInactivePct }}% Inactifs</span>
           </div>
         </div>
         <div class="pub-pro-legend">
-          <span class="legend-dot legend-dot--blue"></span> Public ({{ data.publicVsPro.public }})
+          <span class="legend-dot legend-dot--blue"></span> Centres actifs ({{ data.healthCenterAppUsage?.activeOpeners || 0 }})
           &nbsp;&nbsp;
-          <span class="legend-dot legend-dot--purple"></span> Professionnel ({{ data.publicVsPro.pro }})
-          &nbsp;&nbsp;
-          <span class="legend-dot legend-dot--gray"></span> Non identifié ({{ data.publicVsPro.anon }})
+          <span class="legend-dot legend-dot--purple"></span> Centres inactifs ({{ centerInactiveCount }})
         </div>
       </div>
 
-      <!-- Module usage -->
       <div class="section-card">
-        <h3 class="section-title">Utilisation par module</h3>
+        <h3 class="section-title">Ouvertures de l'application</h3>
         <div class="module-list">
           <div
-            v-for="item in data.byModule"
-            :key="item.module"
+            v-for="item in appOpenActions"
+            :key="item.action"
             class="module-row"
           >
             <div class="module-name">
-              <span class="module-icon">{{ moduleIcon(item.module) }}</span>
-              {{ moduleLabel(item.module) }}
+              <span class="module-icon">📱</span>
+              {{ actionLabel(item.action) }}
             </div>
             <div class="module-bar-wrap">
               <div
                 class="module-bar"
                 :style="{
-                  width: barPct(item.count, maxModuleCount) + '%',
-                  backgroundColor: moduleColor(item.module)
+                  width: barPct(item.count, maxAppOpenCount) + '%',
+                  backgroundColor: moduleColor('app')
                 }"
               ></div>
             </div>
             <div class="module-count">{{ item.count.toLocaleString() }}</div>
-            <div class="module-pct">{{ barPct(item.count, data.total) }}%</div>
+            <div class="module-pct">{{ barPct(item.count, totalAppOpenActions) }}%</div>
           </div>
         </div>
       </div>
 
-      <!-- Function breakdown -->
+      <!-- Complaints stats -->
       <div class="section-card">
-        <h3 class="section-title">Détail par fonction</h3>
-        <div class="action-table">
-          <div class="action-table-head">
-            <span>Module</span>
-            <span>Action</span>
-            <span>Nombre</span>
-            <span>%</span>
+        <h3 class="section-title">📋 Plaintes soumises</h3>
+        <div class="kpi-grid-small">
+          <div class="kpi-sm kpi-sm-blue">
+            <div class="kpi-sm-val">{{ (data.complaintsStats?.total || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Total soumises</div>
           </div>
-          <div
-            v-for="item in data.byAction"
-            :key="item.module + item.action"
-            class="action-table-row"
-          >
-            <span>
-              <span class="module-badge" :style="{ backgroundColor: moduleColor(item.module) + '22', color: moduleColor(item.module) }">
-                {{ moduleLabel(item.module) }}
-              </span>
-            </span>
-            <span class="action-name">{{ actionLabel(item.action) }}</span>
-            <span class="action-count">{{ item.count.toLocaleString() }}</span>
-            <span class="action-pct">{{ barPct(item.count, data.total) }}%</span>
+          <div class="kpi-sm kpi-sm-gray">
+            <div class="kpi-sm-val">{{ (data.complaintsStats?.new || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">En attente</div>
           </div>
+          <div class="kpi-sm kpi-sm-orange">
+            <div class="kpi-sm-val">{{ (data.complaintsStats?.inProgress || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">En traitement</div>
+          </div>
+          <div class="kpi-sm kpi-sm-green">
+            <div class="kpi-sm-val">{{ (data.complaintsStats?.resolved || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Résolues</div>
+          </div>
+          <div class="kpi-sm kpi-sm-red">
+            <div class="kpi-sm-val">{{ (data.complaintsStats?.rejected || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Rejetées</div>
+          </div>
+        </div>
+        <div class="status-bar-wrap" v-if="data.complaintsStats?.total">
+          <div class="status-bar status-bar--gray"   :style="{ width: barPct(data.complaintsStats.new, data.complaintsStats.total) + '%' }" :title="`En attente : ${data.complaintsStats.new}`"></div>
+          <div class="status-bar status-bar--orange" :style="{ width: barPct(data.complaintsStats.inProgress, data.complaintsStats.total) + '%' }" :title="`En traitement : ${data.complaintsStats.inProgress}`"></div>
+          <div class="status-bar status-bar--green"  :style="{ width: barPct(data.complaintsStats.resolved, data.complaintsStats.total) + '%' }" :title="`Résolues : ${data.complaintsStats.resolved}`"></div>
+          <div class="status-bar status-bar--red"    :style="{ width: barPct(data.complaintsStats.rejected, data.complaintsStats.total) + '%' }" :title="`Rejetées : ${data.complaintsStats.rejected}`"></div>
+        </div>
+        <div class="pub-pro-legend" v-if="data.complaintsStats?.total">
+          <span class="legend-dot" style="background:#94A3B8"></span> En attente ({{ data.complaintsStats.new }})&nbsp;&nbsp;
+          <span class="legend-dot" style="background:#EA580C"></span> En traitement ({{ data.complaintsStats.inProgress }})&nbsp;&nbsp;
+          <span class="legend-dot" style="background:#059669"></span> Résolues ({{ data.complaintsStats.resolved }})&nbsp;&nbsp;
+          <span class="legend-dot" style="background:#DC2626"></span> Rejetées ({{ data.complaintsStats.rejected }})
         </div>
       </div>
 
-      <!-- Role distribution -->
+      <!-- Emergency stats -->
       <div class="section-card">
-        <h3 class="section-title">Utilisation par rôle</h3>
-        <div class="module-list">
-          <div
-            v-for="item in data.byRole"
-            :key="item.role"
-            class="module-row"
-          >
-            <div class="module-name" style="min-width:160px">{{ roleLabel(item.role) }}</div>
-            <div class="module-bar-wrap">
-              <div
-                class="module-bar"
-                :style="{
-                  width: barPct(item.count, data.total) + '%',
-                  backgroundColor: roleColor(item.role)
-                }"
-              ></div>
+        <h3 class="section-title">🚑 Urgences sanitaires signalées</h3>
+        <div class="kpi-grid-small">
+          <div class="kpi-sm kpi-sm-red">
+            <div class="kpi-sm-val">{{ (data.emergencyStats?.total || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Total envoyées</div>
+          </div>
+          <div class="kpi-sm kpi-sm-gray">
+            <div class="kpi-sm-val">{{ (data.emergencyStats?.new || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">En attente</div>
+          </div>
+          <div class="kpi-sm kpi-sm-orange">
+            <div class="kpi-sm-val">{{ (data.emergencyStats?.inProgress || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">En cours</div>
+          </div>
+          <div class="kpi-sm kpi-sm-green">
+            <div class="kpi-sm-val">{{ (data.emergencyStats?.resolved || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Clôturées</div>
+          </div>
+        </div>
+        <template v-if="data.emergencyStats?.byService?.length">
+          <div class="section-subtitle">Par service destinataire</div>
+          <div class="module-list">
+            <div v-for="s in data.emergencyStats.byService" :key="s.service" class="module-row">
+              <div class="module-name"><span class="module-icon">🚑</span>{{ serviceLabel(s.service) }}</div>
+              <div class="module-bar-wrap">
+                <div class="module-bar" :style="{ width: barPct(s.count, data.emergencyStats.total) + '%', backgroundColor: '#DC2626' }"></div>
+              </div>
+              <div class="module-count">{{ s.count.toLocaleString() }}</div>
+              <div class="module-pct">{{ barPct(s.count, data.emergencyStats.total) }}%</div>
             </div>
-            <div class="module-count">{{ item.count.toLocaleString() }}</div>
-            <div class="module-pct">{{ barPct(item.count, data.total) }}%</div>
           </div>
+        </template>
+        <div class="status-bar-wrap" v-if="data.emergencyStats?.total">
+          <div class="status-bar status-bar--gray"   :style="{ width: barPct(data.emergencyStats.new, data.emergencyStats.total) + '%' }"></div>
+          <div class="status-bar status-bar--orange" :style="{ width: barPct(data.emergencyStats.inProgress, data.emergencyStats.total) + '%' }"></div>
+          <div class="status-bar status-bar--green"  :style="{ width: barPct(data.emergencyStats.resolved, data.emergencyStats.total) + '%' }"></div>
         </div>
       </div>
 
-      <!-- Daily activity -->
+      <!-- Security alert stats -->
       <div class="section-card">
-        <h3 class="section-title">Activité quotidienne</h3>
-        <div class="daily-chart">
-          <div
-            v-for="item in data.daily"
-            :key="item.day"
-            class="daily-col"
-            :title="`${formatDay(item.day)} : ${item.count} actions`"
-          >
-            <div class="daily-bar-wrap">
-              <div
-                class="daily-bar"
-                :style="{ height: dailyBarHeight(item.count) + '%' }"
-              ></div>
-            </div>
-            <div class="daily-label">{{ formatDay(item.day) }}</div>
+        <h3 class="section-title">🚨 Alertes sécuritaires signalées</h3>
+        <div class="kpi-grid-small">
+          <div class="kpi-sm kpi-sm-purple">
+            <div class="kpi-sm-val">{{ (data.securityStats?.total || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Total envoyées</div>
+          </div>
+          <div class="kpi-sm kpi-sm-gray">
+            <div class="kpi-sm-val">{{ (data.securityStats?.new || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">En attente</div>
+          </div>
+          <div class="kpi-sm kpi-sm-orange">
+            <div class="kpi-sm-val">{{ (data.securityStats?.inProgress || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Prises en compte</div>
+          </div>
+          <div class="kpi-sm kpi-sm-green">
+            <div class="kpi-sm-val">{{ (data.securityStats?.resolved || 0).toLocaleString() }}</div>
+            <div class="kpi-sm-label">Résolues/Clôturées</div>
           </div>
         </div>
-        <div v-if="!data.daily.length" class="empty-hint">Aucune donnée sur la période</div>
+        <template v-if="data.securityStats?.byService?.length">
+          <div class="section-subtitle">Par service destinataire</div>
+          <div class="module-list">
+            <div v-for="s in data.securityStats.byService" :key="s.service" class="module-row">
+              <div class="module-name"><span class="module-icon">🚨</span>{{ serviceLabel(s.service) }}</div>
+              <div class="module-bar-wrap">
+                <div class="module-bar" :style="{ width: barPct(s.count, data.securityStats.total) + '%', backgroundColor: '#7C3AED' }"></div>
+              </div>
+              <div class="module-count">{{ s.count.toLocaleString() }}</div>
+              <div class="module-pct">{{ barPct(s.count, data.securityStats.total) }}%</div>
+            </div>
+          </div>
+        </template>
+        <div class="status-bar-wrap" v-if="data.securityStats?.total">
+          <div class="status-bar status-bar--gray"   :style="{ width: barPct(data.securityStats.new, data.securityStats.total) + '%' }"></div>
+          <div class="status-bar status-bar--orange" :style="{ width: barPct(data.securityStats.inProgress, data.securityStats.total) + '%' }"></div>
+          <div class="status-bar status-bar--green"  :style="{ width: barPct(data.securityStats.resolved, data.securityStats.total) + '%' }"></div>
+        </div>
       </div>
     </template>
 
@@ -218,39 +253,39 @@ async function load() {
 
 onMounted(load);
 
-const maxModuleCount = computed(() =>
-  data.value ? Math.max(...data.value.byModule.map((m) => m.count), 1) : 1
+const appOpenActions = computed(() =>
+  (data.value?.byAction || []).filter((item) =>
+    (item.module === "app" && ["login", "screen_view", "app_open"].includes(item.action)) ||
+    item.action === "login"
+  )
 );
 
-const pubPct = computed(() => {
-  if (!data.value) return 0;
-  const total = data.value.publicVsPro.public + data.value.publicVsPro.pro + data.value.publicVsPro.anon;
-  return total ? Math.round((data.value.publicVsPro.public / total) * 100) : 0;
-});
-const proPct = computed(() => {
-  if (!data.value) return 0;
-  const total = data.value.publicVsPro.public + data.value.publicVsPro.pro + data.value.publicVsPro.anon;
-  return total ? Math.round((data.value.publicVsPro.pro / total) * 100) : 0;
-});
-const anonPct = computed(() => 100 - pubPct.value - proPct.value);
-
-const maxDaily = computed(() =>
-  data.value ? Math.max(...data.value.daily.map((d) => d.count), 1) : 1
+const totalAppOpenActions = computed(() =>
+  appOpenActions.value.reduce((sum, item) => sum + Number(item.count || 0), 0)
 );
+
+const maxAppOpenCount = computed(() =>
+  Math.max(...appOpenActions.value.map((item) => Number(item.count || 0)), 1)
+);
+
+const centerUsagePct = computed(() => Math.round(Number(data.value?.healthCenterAppUsage?.rate || 0)));
+const centerInactiveCount = computed(() => {
+  const eligible = Number(data.value?.healthCenterAppUsage?.eligibleUsers || 0);
+  const active = Number(data.value?.healthCenterAppUsage?.activeOpeners || 0);
+  return Math.max(eligible - active, 0);
+});
+const centerInactivePct = computed(() => {
+  const eligible = Number(data.value?.healthCenterAppUsage?.eligibleUsers || 0);
+  return eligible ? Math.round((centerInactiveCount.value / eligible) * 100) : 0;
+});
 
 function barPct(count, total) {
   if (!total) return 0;
   return Math.round((count / total) * 100);
 }
 
-function dailyBarHeight(count) {
-  return Math.max(4, Math.round((count / maxDaily.value) * 100));
-}
-
-function formatDay(dayStr) {
-  if (!dayStr) return "";
-  const d = new Date(dayStr);
-  return `${d.getDate()}/${d.getMonth() + 1}`;
+function formatRate(value) {
+  return `${Number(value || 0).toFixed(1)}%`;
 }
 
 const MODULE_LABELS = {
@@ -298,9 +333,10 @@ function moduleIcon(m) { return MODULE_ICONS[m] || "📊"; }
 function moduleColor(m) { return MODULE_COLORS[m] || "#64748B"; }
 
 const ACTION_LABELS = {
-  screen_view: "Vue écran",
+  screen_view: "Ouverture / vue d'écran",
   login: "Connexion",
   logout: "Déconnexion",
+  app_open: "Ouverture de l'application",
   submit: "Soumission",
   refresh: "Actualisation",
   send_emergency: "Urgence envoyée",
@@ -310,38 +346,15 @@ const ACTION_LABELS = {
 };
 function actionLabel(a) { return ACTION_LABELS[a] || a; }
 
-const ROLE_LABELS = {
-  USER: "Utilisateur public",
-  REGULATOR: "Régulateur",
-  NATIONAL: "National",
-  REGION: "Région",
-  DISTRICT: "District",
-  ETABLISSEMENT: "Etablissement",
-  CHEF_ETABLISSEMENT: "Chef d'établissement",
-  SAMU: "SAMU",
+const SERVICE_LABELS = {
   SAPEUR_POMPIER: "Sapeurs-Pompiers",
+  SAMU: "SAMU",
   POLICE: "Police",
   GENDARMERIE: "Gendarmerie",
   PROTECTION_CIVILE: "Protection Civile",
-  DEVELOPER: "Développeur",
-  anonyme: "Non identifié",
+  CROIX_ROUGE: "Croix-Rouge",
 };
-const ROLE_COLORS = {
-  USER: "#1A56DB",
-  REGULATOR: "#7C3AED",
-  NATIONAL: "#0891B2",
-  REGION: "#059669",
-  DISTRICT: "#D97706",
-  CHEF_ETABLISSEMENT: "#0891B2",
-  SAMU: "#EA580C",
-  SAPEUR_POMPIER: "#EA580C",
-  POLICE: "#334155",
-  GENDARMERIE: "#334155",
-  DEVELOPER: "#DC2626",
-  anonyme: "#94A3B8",
-};
-function roleLabel(r) { return ROLE_LABELS[r] || r; }
-function roleColor(r) { return ROLE_COLORS[r] || "#64748B"; }
+function serviceLabel(s) { return SERVICE_LABELS[s] || s; }
 </script>
 
 <style scoped>
@@ -475,4 +488,26 @@ function roleColor(r) { return ROLE_COLORS[r] || "#64748B"; }
 
 .analytics-empty { text-align: center; padding: 48px 24px; color: #64748B; }
 .empty-hint { color: #94A3B8; font-size: 13px; margin-top: 12px; text-align: center; }
+
+/* Small KPI grid */
+.kpi-grid-small { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi-sm { border-radius: 12px; padding: 14px 12px; color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.10); }
+.kpi-sm-val { font-size: 24px; font-weight: 900; line-height: 1; }
+.kpi-sm-label { font-size: 11px; font-weight: 700; margin-top: 4px; opacity: 0.88; }
+.kpi-sm-blue   { background: linear-gradient(135deg, #1A56DB, #1337A4); }
+.kpi-sm-gray   { background: linear-gradient(135deg, #64748B, #475569); }
+.kpi-sm-orange { background: linear-gradient(135deg, #EA580C, #C2410C); }
+.kpi-sm-green  { background: linear-gradient(135deg, #059669, #047857); }
+.kpi-sm-red    { background: linear-gradient(135deg, #DC2626, #B91C1C); }
+.kpi-sm-purple { background: linear-gradient(135deg, #7C3AED, #6D28D9); }
+
+/* Status bar */
+.status-bar-wrap { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: #F1F5F9; margin-top: 10px; }
+.status-bar { height: 100%; transition: width 0.5s ease; min-width: 0; }
+.status-bar--gray   { background: #94A3B8; }
+.status-bar--orange { background: #EA580C; }
+.status-bar--green  { background: #059669; }
+.status-bar--red    { background: #DC2626; }
+
+.section-subtitle { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px; }
 </style>

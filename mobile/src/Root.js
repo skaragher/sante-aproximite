@@ -1,4 +1,4 @@
-import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch, clearLocalCache, getPendingRequestsCount, syncPendingRequests, trackEvent } from "./api/client";
 import { useAuth } from "./context/AuthContext";
@@ -524,16 +524,6 @@ export function Root() {
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ flex: 1 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[C.primary]}
-              tintColor={C.primary}
-              title="Actualisation..."
-              titleColor={C.textMuted}
-            />
-          }
           scrollEnabled={false}
           nestedScrollEnabled
         >
