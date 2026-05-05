@@ -150,9 +150,11 @@
                 :style="`background:${section.color}18;`"
               >
                 <td :colspan="ROLES.length + 1" :style="`color:${section.color}`">
-                  <span class="roles-section-arrow" :class="{ open: !collapsedMatrix.has(section.section) }">▾</span>
-                  {{ section.section }}
-                  <span class="roles-section-perm-count">{{ section.items.length }} permission{{ section.items.length > 1 ? 's' : '' }}</span>
+                  <div class="roles-section-row-inner">
+                    <span class="roles-section-arrow" :class="{ open: !collapsedMatrix.has(section.section) }">▾</span>
+                    <span>{{ section.section }}</span>
+                    <span class="roles-section-perm-count">{{ section.items.length }} permission{{ section.items.length > 1 ? 's' : '' }}</span>
+                  </div>
                 </td>
               </tr>
               <template v-if="!collapsedMatrix.has(section.section)">
@@ -656,7 +658,8 @@ async function doDelete() {
 .roles-th-perm { text-align: left; padding: 14px 20px; background: #0f172a; color: #fff; font-size: 0.8rem; font-weight: 700; position: sticky; left: 0; z-index: 2; min-width: 260px; }
 .roles-th-role { padding: 10px 8px; background: #0f172a; text-align: center; min-width: 90px; }
 .roles-col-header { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.75rem; font-weight: 700; }
-.roles-section-row td { padding: 8px 20px; font-size: 0.75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.roles-section-row td { padding: 8px 20px; font-size: 0.75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.roles-section-row-inner { display: flex; align-items: center; gap: 8px; }
 .roles-section-row--toggle { cursor: pointer; }
 .roles-section-row--toggle:hover td { filter: brightness(0.95); }
 .roles-section-arrow { font-size: 0.85rem; transition: transform .2s; display: inline-block; flex-shrink: 0; }
