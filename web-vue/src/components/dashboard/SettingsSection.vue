@@ -210,73 +210,38 @@
                   {{ u.isActive === false ? "DESACTIVE" : (u.approvalStatus || "ACTIF") }}
                 </td>
                 <td>
-                  <!-- Desktop actions -->
-                  <div class="settings-actions-inline settings-actions-desktop">
+                  <div class="user-actions-wrap">
                     <button
-                      v-if="(u.role === 'ETABLISSEMENT' || u.role === 'CHEF_ETABLISSEMENT') && u.approvalStatus === 'PENDING'"
-                      class="ghost"
-                      @click="store.reviewChef(u.id, 'APPROVE')"
+                      class="ghost user-actions-toggle"
+                      :class="{ active: expandedUserId === u.id }"
+                      @click="expandedUserId = expandedUserId === u.id ? null : u.id"
                     >
-                      Approuver
+                      Actions ▾
                     </button>
-                    <button
-                      v-if="(u.role === 'ETABLISSEMENT' || u.role === 'CHEF_ETABLISSEMENT') && u.approvalStatus === 'PENDING'"
-                      class="ghost danger"
-                      @click="store.reviewChef(u.id, 'REJECT')"
-                    >
-                      Rejeter
-                    </button>
-                    <button class="ghost" @click="store.startEditUser(u)">Modifier</button>
-                    <button
-                      class="ghost"
-                      :disabled="String(auth.state.user?.id) === String(u.id)"
-                      @click="store.toggleUserActive(u)"
-                    >
-                      {{ u.isActive === false ? "Activer" : "Desactiver" }}
-                    </button>
-                    <button
-                      class="ghost danger"
-                      :disabled="String(auth.state.user?.id) === String(u.id)"
-                      @click="store.deleteUser(u.id)"
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                  <!-- Mobile actions -->
-                  <details class="settings-actions-mobile">
-                    <summary>Voir actions</summary>
-                    <div class="settings-actions-inline">
+                    <div v-if="expandedUserId === u.id" class="user-actions-dropdown">
                       <button
                         v-if="(u.role === 'ETABLISSEMENT' || u.role === 'CHEF_ETABLISSEMENT') && u.approvalStatus === 'PENDING'"
                         class="ghost"
-                        @click="store.reviewChef(u.id, 'APPROVE')"
-                      >
-                        Approuver
-                      </button>
+                        @click="store.reviewChef(u.id, 'APPROVE'); expandedUserId = null"
+                      >Approuver</button>
                       <button
                         v-if="(u.role === 'ETABLISSEMENT' || u.role === 'CHEF_ETABLISSEMENT') && u.approvalStatus === 'PENDING'"
                         class="ghost danger"
-                        @click="store.reviewChef(u.id, 'REJECT')"
-                      >
-                        Rejeter
-                      </button>
-                      <button class="ghost" @click="store.startEditUser(u)">Modifier</button>
+                        @click="store.reviewChef(u.id, 'REJECT'); expandedUserId = null"
+                      >Rejeter</button>
+                      <button class="ghost" @click="store.startEditUser(u); expandedUserId = null">Modifier</button>
                       <button
                         class="ghost"
                         :disabled="String(auth.state.user?.id) === String(u.id)"
-                        @click="store.toggleUserActive(u)"
-                      >
-                        {{ u.isActive === false ? "Activer" : "Desactiver" }}
-                      </button>
+                        @click="store.toggleUserActive(u); expandedUserId = null"
+                      >{{ u.isActive === false ? "Activer" : "Désactiver" }}</button>
                       <button
                         class="ghost danger"
                         :disabled="String(auth.state.user?.id) === String(u.id)"
-                        @click="store.deleteUser(u.id)"
-                      >
-                        Supprimer
-                      </button>
+                        @click="store.deleteUser(u.id); expandedUserId = null"
+                      >Supprimer</button>
                     </div>
-                  </details>
+                  </div>
                 </td>
               </tr>
               <tr v-if="store.filteredUsers.length === 0">
@@ -366,12 +331,15 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useDashboardStore } from "../../stores/dashboard";
+import { useAuthStore } from "../../stores/auth";
 import UsersMgmtSection from "./UsersMgmtSection.vue";
 import CentersAdminSection from "./CentersAdminSection.vue";
 
 const store = useDashboardStore();
+const auth = useAuthStore();
+const expandedUserId = ref(null);
 const canSeeCentersTab = computed(() => store.isRegulator);
 
 function formatRegionLabel(regionCode) {
@@ -484,6 +452,28 @@ const pendingCentersByRegion = computed(() => {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ── User actions dropdown ── */
+.user-actions-wrap { position: relative; display: inline-block; }
+.user-actions-toggle {
+  font-size: 0.78rem; padding: 5px 10px; white-space: nowrap;
+  border-radius: 8px; font-weight: 700;
+}
+.user-actions-toggle.active { background: #EFF6FF; border-color: #1A56DB; color: #1A56DB; }
+.user-actions-dropdown {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 100;
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px; min-width: 150px;
+}
+.user-actions-dropdown .ghost {
+  text-align: left; border-radius: 8px; font-size: 0.82rem;
+  padding: 7px 12px; white-space: nowrap;
+}
+.user-actions-dropdown .ghost:hover { background: #F8FAFF; }
+.user-actions-dropdown .danger { color: #DC2626; }
+.user-actions-dropdown .danger:hover { background: #FEF2F2; }
 
 @media (max-width: 960px) {
   .settings-switch {
