@@ -427,17 +427,22 @@ function serviceLabel(s) { return SERVICE_LABELS[s] || s; }
 
 /* Layout deux colonnes */
 .analytics-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr;
+  display: flex;
   gap: 20px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 /* Sidebar */
 .stat-sidebar {
+  flex-shrink: 0;
+  width: 240px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
 }
 .stat-tab {
   display: flex;
@@ -468,7 +473,7 @@ function serviceLabel(s) { return SERVICE_LABELS[s] || s; }
 .stat-tab--active .stat-tab-arrow { color: rgba(255,255,255,0.6); }
 
 /* Panneau droit */
-.stat-detail { min-width: 0; }
+.stat-detail { flex: 1; min-width: 0; }
 
 /* KPI cards */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 18px; }
@@ -528,6 +533,7 @@ function serviceLabel(s) { return SERVICE_LABELS[s] || s; }
 .analytics-empty { text-align: center; padding: 48px 24px; color: #64748B; }
 
 @media (max-width: 700px) {
-  .analytics-layout { grid-template-columns: 1fr; }
+  .analytics-layout { flex-direction: column; }
+  .stat-sidebar { width: 100%; }
 }
 </style>
