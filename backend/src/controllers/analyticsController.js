@@ -6,7 +6,7 @@ export async function logEvent(req, res) {
     return res.status(400).json({ message: "module et action sont requis" });
   }
   const userId = req.user?.id ? Number(req.user.id) : null;
-  const userRole = req.user?.role || null;
+  const userRole = req.user?.role || req.body?.role || null;
 
   await pool.query(
     `INSERT INTO analytics_events (user_id, user_role, module, action, metadata)

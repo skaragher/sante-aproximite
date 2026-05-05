@@ -175,15 +175,20 @@ async function enqueueOfflineRequest(path, { token, method, body }) {
 }
 
 export function trackEvent(module, action, metadata) {
-  AsyncStorage.getItem(TOKEN_KEY)
-    .then((token) =>
-      requestApi("/analytics/event", {
+  Promise.all([
+    AsyncStorage.getItem(TOKEN_KEY),
+    AsyncStorage.getItem(USER_KEY),
+  ])
+    .then(([token, userRaw]) => {
+      let role = null;
+      try { role = JSON.parse(userRaw || "null")?.role || null; } catch {}
+      return requestApi("/analytics/event", {
         token: token || undefined,
         method: "POST",
-        body: { module, action, metadata: metadata || undefined },
+        body: { module, action, role, metadata: metadata || undefined },
         timeoutMs: 5000,
-      })
-    )
+      });
+    })
     .catch(() => {});
 }
 
