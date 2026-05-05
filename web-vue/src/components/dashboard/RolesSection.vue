@@ -188,10 +188,17 @@
             <div class="rbac-role-panel-right">
               <div class="rbac-panel-title">Permissions</div>
               <template v-for="section in permissionsBySection" :key="section.section">
-                <div class="rbac-perm-section-label" :style="`color:${section.color};border-left-color:${section.color}`">
-                  {{ section.section }}
-                </div>
-                <div class="rbac-perm-grid">
+                <button
+                  class="rbac-perm-section-label rbac-perm-section-toggle"
+                  :style="`color:${section.color};border-left-color:${section.color}`"
+                  @click="toggleSection(section.section)"
+                  type="button"
+                >
+                  <span>{{ section.section }}</span>
+                  <span class="rbac-section-badge">{{ sectionCheckedCount(section) }}/{{ section.items.length }}</span>
+                  <span class="rbac-section-arrow" :class="{ open: !collapsedSections.has(section.section) }">▾</span>
+                </button>
+                <div class="rbac-perm-grid" v-show="!collapsedSections.has(section.section)">
                   <label
                     v-for="perm in section.items"
                     :key="perm.key"
@@ -381,6 +388,18 @@ function userName(userId) {
 const showRoleModal = ref(false);
 const editingRole = ref(null);
 const roleForm = reactive({ name: "", description: "", permissions: [] });
+const collapsedSections = ref(new Set());
+
+function toggleSection(sectionName) {
+  const s = new Set(collapsedSections.value);
+  if (s.has(sectionName)) s.delete(sectionName);
+  else s.add(sectionName);
+  collapsedSections.value = s;
+}
+
+function sectionCheckedCount(section) {
+  return section.items.filter(p => roleForm.permissions.includes(p.key)).length;
+}
 
 function openCreateModal() {
   editingRole.value = null;
@@ -631,6 +650,22 @@ async function doDelete() {
   border-left: 3px solid; background: #f8fafc; border-radius: 0 6px 6px 0;
 }
 .rbac-perm-section-label:first-child { margin-top: 0; }
+.rbac-perm-section-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; border: none; text-align: left;
+  transition: background .12s;
+}
+.rbac-perm-section-toggle:hover { background: #f1f5f9; }
+.rbac-section-badge {
+  margin-left: auto; background: currentColor;
+  color: #fff; border-radius: 20px; padding: 1px 7px;
+  font-size: 0.7rem; opacity: 0.85;
+}
+.rbac-section-arrow {
+  font-size: 0.9rem; transition: transform .2s; display: inline-block;
+}
+.rbac-section-arrow.open { transform: rotate(0deg); }
+.rbac-section-arrow:not(.open) { transform: rotate(-90deg); }
 
 .rbac-perm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
 
