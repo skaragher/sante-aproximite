@@ -62,15 +62,15 @@
 
             <td class="um-cell-scope">
               <div v-if="user.centerName" class="um-scope-line">
-                <span class="um-chip um-chip-ste">Centre</span>
+                <span class="um-chip um-chip-ste">Ste</span>
                 <span class="um-scope-text">{{ user.centerName }}</span>
               </div>
               <div v-if="user.districtCode" class="um-scope-line">
-                <span class="um-chip um-chip-dir">District</span>
+                <span class="um-chip um-chip-dir">Dir</span>
                 <span class="um-scope-text">{{ districtName(user.districtCode) }}</span>
               </div>
               <div v-else-if="user.regionCode" class="um-scope-line">
-                <span class="um-chip um-chip-reg">Région</span>
+                <span class="um-chip um-chip-reg">Rég</span>
                 <span class="um-scope-text">{{ regionName(user.regionCode) }}</span>
               </div>
               <span v-if="!user.centerName && !user.districtCode && !user.regionCode" class="um-scope-none">-</span>
