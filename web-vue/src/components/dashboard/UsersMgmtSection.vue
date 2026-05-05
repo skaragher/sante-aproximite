@@ -84,18 +84,29 @@
                 </div>
               </template>
               <template v-else>
-                <div class="um-listbox">
-                  <div
-                    v-for="r in visibleRoles"
-                    :key="r.value"
-                    class="um-lb-row"
-                    :class="{ 'um-lb-sel': getLocalRoles(user.id).includes(r.value) }"
-                    @click="toggleRole(user.id, r.value, user)"
-                  >{{ r.label }}</div>
+                <div class="um-roles-wrap">
+                  <button
+                    class="um-roles-toggle"
+                    :class="{ active: expandedRolesId === user.id }"
+                    @click="expandedRolesId = expandedRolesId === user.id ? null : user.id"
+                  >
+                    🏷 Rôles ({{ getLocalRoles(user.id).length }}) ▾
+                  </button>
+                  <div v-if="expandedRolesId === user.id" class="um-roles-dropdown">
+                    <div class="um-listbox">
+                      <div
+                        v-for="r in visibleRoles"
+                        :key="r.value"
+                        class="um-lb-row"
+                        :class="{ 'um-lb-sel': getLocalRoles(user.id).includes(r.value) }"
+                        @click="toggleRole(user.id, r.value, user)"
+                      >{{ r.label }}</div>
+                    </div>
+                    <button class="um-save-roles-btn" @click="saveRoles(user); expandedRolesId = null">
+                      💾 Enregistrer les rôles
+                    </button>
+                  </div>
                 </div>
-                <button class="um-save-roles-btn" style="background:#fff;color:#2563eb;border:1px solid #3b82f6;" @click="saveRoles(user)">
-                  💾 Enregistrer les rôles
-                </button>
               </template>
             </td>
 
@@ -271,6 +282,7 @@ const auth = useAuthStore();
 const localError = ref("");
 const localSuccess = ref("");
 const expandedUserId = ref(null);
+const expandedRolesId = ref(null);
 function showErr(msg) { localError.value = msg; setTimeout(() => { localError.value = ""; }, 4500); }
 function showOk(msg) { localSuccess.value = msg; setTimeout(() => { localSuccess.value = ""; }, 3000); }
 
@@ -697,7 +709,20 @@ onMounted(async () => {
 .um-cell-email { color: #475569; font-size: 0.84rem; min-width: 160px; }
 .um-cell-status { white-space: nowrap; }
 .um-cell-scope { font-size: 0.8rem; min-width: 170px; }
-.um-cell-roles { min-width: 200px; }
+.um-cell-roles { min-width: 140px; }
+.um-roles-wrap { position: relative; display: inline-block; }
+.um-roles-toggle {
+  background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1;
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.um-roles-toggle.active { background: #EFF6FF; border-color: #1A56DB; color: #1A56DB; }
+.um-roles-dropdown {
+  position: absolute; left: 0; top: calc(100% + 4px); z-index: 200;
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.14);
+  padding: 8px; min-width: 200px;
+}
 .um-cell-pwd   { min-width: 185px; }
 .um-cell-actions { min-width: 120px; }
 .um-actions-wrap { position: relative; display: inline-block; }
