@@ -119,17 +119,26 @@
             </td>
 
             <td class="um-cell-actions">
-              <button class="um-btn um-edit" style="background:#ffbf10;color:#2b2110;border:1px solid #e0a300;" @click="startEdit(user)">✏ Modifier</button>
-              <template v-if="isDevUser(user)">
-                <button class="um-btn um-dev-protected" disabled>🔒 Developer protégé</button>
-              </template>
-              <template v-else>
-                <button class="um-btn um-toggle" style="background:#f8f9fb;color:#6b7280;border:1px solid #9ca3af;" @click="store.toggleUserActive(user)">
-                  {{ user.isActive ? '🚫 Désactiver' : '✅ Activer' }}
-                </button>
-                <button v-if="canManageRights" class="um-btn um-rights" style="background:#7c3aed;color:#fff;border:1px solid #6d28d9;" @click="openRights(user)">🛡 Gérer les droits</button>
-                <button class="um-btn um-del" style="background:#e33445;color:#fff;border:1px solid #c82333;" @click="askDelete(user)">🗑 Supprimer</button>
-              </template>
+              <div class="um-actions-wrap">
+                <button
+                  class="um-btn um-actions-toggle"
+                  :class="{ active: expandedUserId === user.id }"
+                  @click="expandedUserId = expandedUserId === user.id ? null : user.id"
+                >Actions ▾</button>
+                <div v-if="expandedUserId === user.id" class="um-actions-dropdown">
+                  <button class="um-drop-btn um-drop-edit" @click="startEdit(user); expandedUserId = null">✏ Modifier</button>
+                  <template v-if="isDevUser(user)">
+                    <button class="um-drop-btn" disabled>🔒 Developer protégé</button>
+                  </template>
+                  <template v-else>
+                    <button class="um-drop-btn um-drop-toggle" @click="store.toggleUserActive(user); expandedUserId = null">
+                      {{ user.isActive ? '🚫 Désactiver' : '✅ Activer' }}
+                    </button>
+                    <button v-if="canManageRights" class="um-drop-btn um-drop-rights" @click="openRights(user); expandedUserId = null">🛡 Gérer les droits</button>
+                    <button class="um-drop-btn um-drop-del" @click="askDelete(user); expandedUserId = null">🗑 Supprimer</button>
+                  </template>
+                </div>
+              </div>
             </td>
 
           </tr>
@@ -261,6 +270,7 @@ const auth = useAuthStore();
 // ─── Messages ─────────────────────────────────────────────────────────────────
 const localError = ref("");
 const localSuccess = ref("");
+const expandedUserId = ref(null);
 function showErr(msg) { localError.value = msg; setTimeout(() => { localError.value = ""; }, 4500); }
 function showOk(msg) { localSuccess.value = msg; setTimeout(() => { localSuccess.value = ""; }, 3000); }
 
@@ -689,7 +699,36 @@ onMounted(async () => {
 .um-cell-scope { font-size: 0.8rem; min-width: 170px; }
 .um-cell-roles { min-width: 200px; }
 .um-cell-pwd   { min-width: 185px; }
-.um-cell-actions { min-width: 155px; }
+.um-cell-actions { min-width: 120px; }
+.um-actions-wrap { position: relative; display: inline-block; }
+.um-actions-toggle {
+  background: #1A56DB; color: #fff; border: none;
+  border-radius: 8px; padding: 6px 12px;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.um-actions-toggle.active { background: #1337A4; }
+.um-actions-dropdown {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 200;
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.14);
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px; min-width: 170px;
+}
+.um-drop-btn {
+  text-align: left; border: none; background: transparent;
+  border-radius: 8px; padding: 8px 12px; font-size: 0.82rem;
+  font-weight: 600; cursor: pointer; white-space: nowrap; width: 100%;
+  transition: background .1s;
+}
+.um-drop-btn:hover:not(:disabled) { background: #F1F5F9; }
+.um-drop-btn:disabled { opacity: 0.5; cursor: default; }
+.um-drop-edit   { color: #92400E; background: #FFFBEB; }
+.um-drop-edit:hover { background: #FEF3C7; }
+.um-drop-toggle { color: #374151; }
+.um-drop-rights { color: #5B21B6; }
+.um-drop-rights:hover { background: #F5F3FF; }
+.um-drop-del    { color: #DC2626; }
+.um-drop-del:hover { background: #FEF2F2; }
 
 /* Status badge */
 .um-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
