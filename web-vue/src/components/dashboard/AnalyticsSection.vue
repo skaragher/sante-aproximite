@@ -99,30 +99,26 @@
       <!-- Complaints stats -->
       <div class="section-card">
         <h3 class="section-title">📋 Plaintes soumises</h3>
+        <div class="kpi-sub-total">{{ (data.complaintsStats?.total || 0).toLocaleString() }} plainte(s) sur {{ period }} jours</div>
         <div class="kpi-grid">
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.complaintsStats?.total || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Total soumises</div>
+            <div class="kpi-value">{{ formatRate(pct(data.complaintsStats?.resolved, data.complaintsStats?.total)) }}</div>
+            <div class="kpi-label">Taux de résolution</div>
             <div class="kpi-sub">{{ period }} jours</div>
           </div>
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.complaintsStats?.new || 0).toLocaleString() }}</div>
-            <div class="kpi-label">En attente</div>
-            <div class="kpi-sub">non traitées</div>
-          </div>
-          <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.complaintsStats?.inProgress || 0).toLocaleString() }}</div>
-            <div class="kpi-label">En traitement</div>
+            <div class="kpi-value">{{ formatRate(pct(data.complaintsStats?.inProgress, data.complaintsStats?.total)) }}</div>
+            <div class="kpi-label">Taux en traitement</div>
             <div class="kpi-sub">en cours</div>
           </div>
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.complaintsStats?.resolved || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Résolues</div>
-            <div class="kpi-sub">clôturées</div>
+            <div class="kpi-value">{{ formatRate(pct(data.complaintsStats?.new, data.complaintsStats?.total)) }}</div>
+            <div class="kpi-label">Taux en attente</div>
+            <div class="kpi-sub">non traitées</div>
           </div>
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.complaintsStats?.rejected || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Rejetées</div>
+            <div class="kpi-value">{{ formatRate(pct(data.complaintsStats?.rejected, data.complaintsStats?.total)) }}</div>
+            <div class="kpi-label">Taux de rejet</div>
             <div class="kpi-sub">non retenues</div>
           </div>
         </div>
@@ -143,26 +139,22 @@
       <!-- Emergency stats -->
       <div class="section-card">
         <h3 class="section-title">🚑 Urgences sanitaires signalées</h3>
+        <div class="kpi-sub-total">{{ (data.emergencyStats?.total || 0).toLocaleString() }} urgence(s) sur {{ period }} jours</div>
         <div class="kpi-grid">
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.emergencyStats?.total || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Total envoyées</div>
+            <div class="kpi-value">{{ formatRate(pct(data.emergencyStats?.resolved, data.emergencyStats?.total)) }}</div>
+            <div class="kpi-label">Taux de clôture</div>
             <div class="kpi-sub">{{ period }} jours</div>
           </div>
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.emergencyStats?.new || 0).toLocaleString() }}</div>
-            <div class="kpi-label">En attente</div>
+            <div class="kpi-value">{{ formatRate(pct(data.emergencyStats?.inProgress, data.emergencyStats?.total)) }}</div>
+            <div class="kpi-label">Taux en intervention</div>
+            <div class="kpi-sub">en cours</div>
+          </div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-value">{{ formatRate(pct(data.emergencyStats?.new, data.emergencyStats?.total)) }}</div>
+            <div class="kpi-label">Taux en attente</div>
             <div class="kpi-sub">non prises en charge</div>
-          </div>
-          <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.emergencyStats?.inProgress || 0).toLocaleString() }}</div>
-            <div class="kpi-label">En cours</div>
-            <div class="kpi-sub">en intervention</div>
-          </div>
-          <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.emergencyStats?.resolved || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Clôturées</div>
-            <div class="kpi-sub">terminées</div>
           </div>
         </div>
         <template v-if="data.emergencyStats?.byService?.length">
@@ -188,26 +180,22 @@
       <!-- Security alert stats -->
       <div class="section-card">
         <h3 class="section-title">🚨 Alertes sécuritaires signalées</h3>
+        <div class="kpi-sub-total">{{ (data.securityStats?.total || 0).toLocaleString() }} alerte(s) sur {{ period }} jours</div>
         <div class="kpi-grid">
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.securityStats?.total || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Total envoyées</div>
+            <div class="kpi-value">{{ formatRate(pct(data.securityStats?.resolved, data.securityStats?.total)) }}</div>
+            <div class="kpi-label">Taux de résolution</div>
             <div class="kpi-sub">{{ period }} jours</div>
           </div>
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.securityStats?.new || 0).toLocaleString() }}</div>
-            <div class="kpi-label">En attente</div>
-            <div class="kpi-sub">non traitées</div>
-          </div>
-          <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.securityStats?.inProgress || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Prises en compte</div>
+            <div class="kpi-value">{{ formatRate(pct(data.securityStats?.inProgress, data.securityStats?.total)) }}</div>
+            <div class="kpi-label">Taux pris en compte</div>
             <div class="kpi-sub">en cours</div>
           </div>
           <div class="kpi-card kpi-blue">
-            <div class="kpi-value">{{ (data.securityStats?.resolved || 0).toLocaleString() }}</div>
-            <div class="kpi-label">Résolues / Clôturées</div>
-            <div class="kpi-sub">terminées</div>
+            <div class="kpi-value">{{ formatRate(pct(data.securityStats?.new, data.securityStats?.total)) }}</div>
+            <div class="kpi-label">Taux en attente</div>
+            <div class="kpi-sub">non traitées</div>
           </div>
         </div>
         <template v-if="data.securityStats?.byService?.length">
@@ -295,6 +283,11 @@ const centerInactivePct = computed(() => {
 function barPct(count, total) {
   if (!total) return 0;
   return Math.round((count / total) * 100);
+}
+
+function pct(part, total) {
+  if (!total) return 0;
+  return (Number(part || 0) / Number(total)) * 100;
 }
 
 function formatRate(value) {
@@ -523,4 +516,5 @@ function serviceLabel(s) { return SERVICE_LABELS[s] || s; }
 .status-bar--red    { background: #DC2626; }
 
 .section-subtitle { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px; }
+.kpi-sub-total { font-size: 13px; color: #64748B; font-weight: 600; margin-bottom: 14px; }
 </style>
