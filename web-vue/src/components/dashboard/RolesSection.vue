@@ -144,26 +144,34 @@
           </thead>
           <tbody>
             <template v-for="section in permissionsBySection" :key="section.section">
-              <tr class="roles-section-row">
-                <td :colspan="ROLES.length + 1" :style="`background:${section.color}18;color:${section.color}`">
+              <tr
+                class="roles-section-row roles-section-row--toggle"
+                @click="toggleMatrixSection(section.section)"
+                :style="`background:${section.color}18;`"
+              >
+                <td :colspan="ROLES.length + 1" :style="`color:${section.color}`">
+                  <span class="roles-section-arrow" :class="{ open: !collapsedMatrix.has(section.section) }">▾</span>
                   {{ section.section }}
+                  <span class="roles-section-perm-count">{{ section.items.length }} permission{{ section.items.length > 1 ? 's' : '' }}</span>
                 </td>
               </tr>
-              <tr v-for="perm in section.items" :key="perm.key" class="roles-perm-row">
-                <td class="roles-perm-cell">
-                  <div class="roles-perm-label">{{ perm.label }}</div>
-                  <div class="roles-perm-desc">{{ perm.desc }}</div>
-                </td>
-                <td
-                  v-for="role in ROLES"
-                  :key="role.key"
-                  class="roles-check-cell"
-                  :class="[matrixPerms[role.key]?.has(perm.key) ? 'roles-has' : 'roles-no']"
-                >
-                  <span v-if="matrixPerms[role.key]?.has(perm.key)" class="roles-check-yes" :style="`color:${role.color}`">✔</span>
-                  <span v-else class="roles-check-no">○</span>
-                </td>
-              </tr>
+              <template v-if="!collapsedMatrix.has(section.section)">
+                <tr v-for="perm in section.items" :key="perm.key" class="roles-perm-row">
+                  <td class="roles-perm-cell">
+                    <div class="roles-perm-label">{{ perm.label }}</div>
+                    <div class="roles-perm-desc">{{ perm.desc }}</div>
+                  </td>
+                  <td
+                    v-for="role in ROLES"
+                    :key="role.key"
+                    class="roles-check-cell"
+                    :class="[matrixPerms[role.key]?.has(perm.key) ? 'roles-has' : 'roles-no']"
+                  >
+                    <span v-if="matrixPerms[role.key]?.has(perm.key)" class="roles-check-yes" :style="`color:${role.color}`">✔</span>
+                    <span v-else class="roles-check-no">○</span>
+                  </td>
+                </tr>
+              </template>
             </template>
           </tbody>
         </table>
@@ -408,6 +416,14 @@ const ROLES = [
   { key: "USER",              label: "Utilisateur",       icon: "👤", color: "#64748b", desc: "Utilisateur public" },
 ];
 
+const collapsedMatrix = ref(new Set());
+function toggleMatrixSection(section) {
+  const s = new Set(collapsedMatrix.value);
+  if (s.has(section)) s.delete(section);
+  else s.add(section);
+  collapsedMatrix.value = s;
+}
+
 const matrixPerms = computed(() => {
   const result = {};
   for (const role of ROLES) {
@@ -640,7 +656,13 @@ async function doDelete() {
 .roles-th-perm { text-align: left; padding: 14px 20px; background: #0f172a; color: #fff; font-size: 0.8rem; font-weight: 700; position: sticky; left: 0; z-index: 2; min-width: 260px; }
 .roles-th-role { padding: 10px 8px; background: #0f172a; text-align: center; min-width: 90px; }
 .roles-col-header { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.75rem; font-weight: 700; }
-.roles-section-row td { padding: 8px 20px; font-size: 0.75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.roles-section-row td { padding: 8px 20px; font-size: 0.75rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.roles-section-row--toggle { cursor: pointer; }
+.roles-section-row--toggle:hover td { filter: brightness(0.95); }
+.roles-section-arrow { font-size: 0.85rem; transition: transform .2s; display: inline-block; flex-shrink: 0; }
+.roles-section-arrow.open { transform: rotate(0deg); }
+.roles-section-arrow:not(.open) { transform: rotate(-90deg); }
+.roles-section-perm-count { margin-left: auto; font-size: 0.68rem; font-weight: 600; opacity: 0.65; text-transform: none; letter-spacing: 0; }
 .roles-perm-row { border-bottom: 1px solid #f1f5f9; }
 .roles-perm-row:hover { background: #f8fafc; }
 .roles-perm-cell { padding: 10px 20px; background: #fff; position: sticky; left: 0; z-index: 1; border-right: 1px solid #e2e8f0; }
