@@ -9,6 +9,7 @@ import geoRoutes from "./routes/geoRoutes.js";
 import securityAlertRoutes from "./routes/securityAlertRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import rbacRoutes from "./routes/rbacRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 export const app = express();
@@ -36,5 +37,6 @@ app.use("/api/geo", geoRoutes);
 app.use("/api/security-alerts", securityAlertRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/rbac", rbacRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 app.use(errorHandler);

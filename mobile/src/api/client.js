@@ -174,6 +174,19 @@ async function enqueueOfflineRequest(path, { token, method, body }) {
   await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
 }
 
+export function trackEvent(module, action, metadata) {
+  AsyncStorage.getItem(TOKEN_KEY)
+    .then((token) =>
+      requestApi("/analytics/event", {
+        token: token || undefined,
+        method: "POST",
+        body: { module, action, metadata: metadata || undefined },
+        timeoutMs: 5000,
+      })
+    )
+    .catch(() => {});
+}
+
 export async function clearLocalCache() {
   try {
     const allKeys = await AsyncStorage.getAllKeys();

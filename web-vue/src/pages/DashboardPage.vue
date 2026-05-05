@@ -39,6 +39,9 @@
     <SecurityAlertSection
       v-if="store.tab === 'security-alerts' && store.isSecurityResponder"
     />
+    <AnalyticsSection
+      v-if="store.tab === 'analytics' && (store.isDeveloper || store.isRegulator)"
+    />
   </main>
 </template>
 
@@ -59,6 +62,7 @@ import SapeurPompierSection from "../components/dashboard/SapeurPompierSection.v
 import RolesSection from "../components/dashboard/RolesSection.vue";
 import SecurityAlertSection from "../components/dashboard/SecurityAlertSection.vue";
 import SettingsSection from "../components/dashboard/SettingsSection.vue";
+import AnalyticsSection from "../components/dashboard/AnalyticsSection.vue";
 
 const isSamu = computed(() => store.authRoles.includes("SAMU"));
 const isSapeurPompier = computed(() =>

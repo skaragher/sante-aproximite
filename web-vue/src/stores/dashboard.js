@@ -63,7 +63,7 @@ const _store = (() => {
     const requested = String(tabCandidate || "").trim();
     // DEVELOPER accède à tous les onglets sans restriction
     if (isDeveloper.value) {
-      const allTabs = ["overview", "nearby", "emergency-alerts", "security-alerts", "complaints", "evaluations", "my-center", "settings", "imports", "roles"];
+      const allTabs = ["overview", "nearby", "emergency-alerts", "security-alerts", "complaints", "evaluations", "my-center", "settings", "imports", "roles", "analytics"];
       return allTabs.includes(requested) ? requested : "overview";
     }
     if (isChef.value) {
@@ -77,7 +77,7 @@ const _store = (() => {
     if (isEmergencyResponder.value) allowed.push("emergency-alerts");
     if (isSecurityResponder.value) allowed.push("security-alerts");
     if (isRegulator.value)
-      allowed.push("complaints", "evaluations", "settings", "imports", "roles");
+      allowed.push("complaints", "evaluations", "settings", "imports", "roles", "analytics");
     if (hasAnyRole(["NATIONAL", "REGULATOR"])) allowed.push("roles");
     if (canManageUsers.value) allowed.push("settings");
     if (allowed.includes(requested)) return requested;

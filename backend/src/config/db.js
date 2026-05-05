@@ -856,6 +856,23 @@ async function runMigrations() {
     );
   `);
 
+  // Table analytics_events
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL,
+      user_role TEXT NULL,
+      module TEXT NOT NULL,
+      action TEXT NOT NULL,
+      metadata JSONB NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_analytics_module ON analytics_events(module);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON analytics_events(created_at);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_analytics_user_role ON analytics_events(user_role);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_analytics_user_id ON analytics_events(user_id);`);
+
   // Attribuer le rôle DEVELOPER au compte développeur principal
   await pool.query(`UPDATE users SET role = 'DEVELOPER' WHERE email = 'skaragher@gmail.com';`);
   await pool.query(`

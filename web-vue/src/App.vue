@@ -143,6 +143,7 @@ const menuItems = computed(() => {
     pushItem({ tab: "settings",         label: "Utilisateurs",          icon: "👥", section: "GOUVERNANCE",      decor: "⚙" });
     pushItem({ tab: "imports",          label: "Importations",          icon: "📥", section: "GOUVERNANCE",      decor: "⚙" });
     pushItem({ tab: "roles",            label: "Gestion des rôles",     icon: "🛡", section: "GOUVERNANCE",      decor: "⚙" });
+    pushItem({ tab: "analytics",        label: "Statistiques",          icon: "📈", section: "ANALYTIQUE",       decor: "📊" });
     return items;
   }
 
@@ -175,6 +176,7 @@ const menuItems = computed(() => {
     if (hasAnyRole(["NATIONAL", "REGULATOR"])) {
       pushItem({ tab: "roles", label: "Gestion des roles", icon: "🛡", section: "GOUVERNANCE", decor: "👥" });
     }
+    pushItem({ tab: "analytics", label: "Statistiques", icon: "📈", section: "ANALYTIQUE", decor: "📊" });
   }
 
   return items;

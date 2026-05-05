@@ -1,6 +1,6 @@
 import { ActivityIndicator, AppState, Image, Linking, Modal, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import { apiFetch, clearLocalCache, getPendingRequestsCount, syncPendingRequests } from "./api/client";
+import { apiFetch, clearLocalCache, getPendingRequestsCount, syncPendingRequests, trackEvent } from "./api/client";
 import { useAuth } from "./context/AuthContext";
 import { C, S } from "./theme";
 import { AuthScreen } from "./screens/AuthScreen";
@@ -143,6 +143,16 @@ export function Root() {
     const interval = setInterval(() => { loadChefCenterStatus().catch(() => {}); }, 30000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [user, token, canManageCenters]);
+
+  // Track tab changes
+  useEffect(() => {
+    if (user) trackEvent(currentTab, "screen_view");
+  }, [currentTab]);
+
+  // Track login
+  useEffect(() => {
+    if (user) trackEvent("app", "login");
+  }, [user?.id]);
 
   // Check for app update on mount
   useEffect(() => {
