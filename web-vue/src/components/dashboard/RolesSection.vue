@@ -418,7 +418,7 @@ const ROLES = [
   { key: "USER",              label: "Utilisateur",       icon: "👤", color: "#64748b", desc: "Utilisateur public" },
 ];
 
-const collapsedMatrix = ref(new Set());
+const collapsedMatrix = ref(new Set(Object.keys(SECTION_COLORS)));
 function toggleMatrixSection(section) {
   const s = new Set(collapsedMatrix.value);
   if (s.has(section)) s.delete(section);
