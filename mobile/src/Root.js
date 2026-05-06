@@ -53,6 +53,7 @@ export function Root() {
   const [updateVersion, setUpdateVersion] = useState(null);
   const [showAbout, setShowAbout] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [openFaqIdx, setOpenFaqIdx] = useState(null);
   const [clearingCache, setClearingCache] = useState(false);
 
   const normalizeRoleValue = (value) => String(value || "").trim().toUpperCase().replace(/[\s-]+/g, "_");
@@ -552,82 +553,117 @@ export function Root() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              <View style={styles.aboutLogoWrap}>
-                <Image source={require("../assets/logo-sante.png")} style={styles.aboutLogo} resizeMode="contain" />
-              </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
 
-              <Text style={styles.aboutAppName}>Sante et Securite a Proximite</Text>
-              <Text style={styles.aboutVersion}>Version {APP_VERSION}</Text>
-
-              <View style={styles.aboutDivider} />
-
-              <Text style={styles.aboutSectionTitle}>Description</Text>
-              <Text style={styles.aboutText}>
-                Sante et Securite a Proximite est une application mobile permettant aux citoyens de localiser facilement les centres de sante et services d'urgence a proximite, de soumettre des plaintes, et de signaler des situations d'urgence sanitaire ou securitaire en temps reel.
-              </Text>
-
-              <View style={styles.aboutDivider} />
-
-              <Text style={styles.aboutSectionTitle}>Fonctionnalites</Text>
-              {[
-                "Localisation des centres de sante les plus proches",
-                "Soumission et suivi de plaintes",
-                "Signalement d'urgences sanitaires et securitaires",
-                "Interface dediee aux professionnels de sante",
-                "Coordination SAMU, pompiers et forces de l'ordre",
-                "Fonctionnement hors ligne avec synchronisation automatique",
-              ].map((f, i) => (
-                <View key={i} style={styles.aboutFeatureRow}>
-                  <Text style={styles.aboutFeatureDot}>•</Text>
-                  <Text style={styles.aboutFeatureText}>{f}</Text>
+              {/* Hero */}
+              <View style={styles.aboutHero}>
+                <View style={styles.aboutHeroLogoWrap}>
+                  <Image source={require("../assets/logo-sante.png")} style={styles.aboutHeroLogo} resizeMode="contain" />
                 </View>
-              ))}
-
-              <View style={styles.aboutDivider} />
-
-              <Text style={styles.aboutSectionTitle}>Developpeur</Text>
-              <Text style={styles.aboutText}>YEFA TECHNOLOGIE</Text>
-              <Pressable onPress={() => Linking.openURL("mailto:yefa.technologie@gmail.com")}>
-                <Text style={[styles.aboutText, { color: C.primary, fontWeight: "700", marginTop: 4 }]}>
-                  yefa.technologie@gmail.com
+                <Text style={styles.aboutHeroName}>Sante et Securite{"\n"}a Proximite</Text>
+                <View style={styles.aboutVersionBadge}>
+                  <Text style={styles.aboutVersionBadgeText}>v{APP_VERSION}</Text>
+                </View>
+                <Text style={styles.aboutHeroTagline}>
+                  Plateforme nationale de gestion sanitaire et d'urgences
                 </Text>
-              </Pressable>
-
-              <View style={styles.aboutDivider} />
-
-              <View style={styles.aboutVersionRow}>
-                <Text style={styles.aboutVersionLabel}>Version de l'application</Text>
-                <Text style={styles.aboutVersionValue}>{APP_VERSION}</Text>
               </View>
-              {updateAvailable ? (
-                <Pressable
-                  style={[styles.aboutUpdateBtn]}
-                  onPress={() => Linking.openURL("https://play.google.com/store/apps/details?id=com.yefa.sante")}
-                >
-                  <Text style={styles.aboutUpdateBtnText}>Mise a jour disponible : v{updateVersion} — Mettre a jour</Text>
-                </Pressable>
-              ) : (
-                <Text style={styles.aboutUpToDate}>✓ Application a jour</Text>
-              )}
 
-              <View style={styles.aboutDivider} />
+              {/* Stats chips */}
+              <View style={styles.aboutChipsRow}>
+                {[
+                  { icon: "📱", label: "Mobile" },
+                  { icon: "🌐", label: "Web" },
+                  { icon: "📡", label: "Hors ligne" },
+                  { icon: "🔐", label: "RBAC" },
+                ].map((chip) => (
+                  <View key={chip.label} style={styles.aboutChip}>
+                    <Text style={styles.aboutChipIcon}>{chip.icon}</Text>
+                    <Text style={styles.aboutChipLabel}>{chip.label}</Text>
+                  </View>
+                ))}
+              </View>
 
+              {/* Mission */}
+              <View style={styles.aboutBlock}>
+                <Text style={styles.aboutBlockTitle}>🎯  Mission</Text>
+                <Text style={styles.aboutBlockText}>
+                  Rapprocher les citoyens des services de sante en localisant les centres, coordonnant les urgences et garantissant la transparence des soins a travers tout le territoire national.
+                </Text>
+              </View>
+
+              {/* Features grid */}
+              <View style={styles.aboutBlock}>
+                <Text style={styles.aboutBlockTitle}>⚡  Fonctionnalites</Text>
+                <View style={styles.aboutFeatGrid}>
+                  {[
+                    { icon: "📍", label: "Carte des centres", sub: "Localisation en temps reel" },
+                    { icon: "📝", label: "Plaintes", sub: "Soumission et suivi" },
+                    { icon: "🚨", label: "Urgences sanitaires", sub: "SAMU et Pompiers" },
+                    { icon: "🛡", label: "Urgences securitaires", sub: "Police et Gendarmerie" },
+                    { icon: "🏥", label: "Espace chef", sub: "Gestion de centre" },
+                    { icon: "📡", label: "Mode hors ligne", sub: "Synchronisation auto" },
+                  ].map((f) => (
+                    <View key={f.label} style={styles.aboutFeatCard}>
+                      <Text style={styles.aboutFeatIcon}>{f.icon}</Text>
+                      <Text style={styles.aboutFeatLabel}>{f.label}</Text>
+                      <Text style={styles.aboutFeatSub}>{f.sub}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* Developer */}
+              <View style={styles.aboutBlock}>
+                <Text style={styles.aboutBlockTitle}>🏢  Developpeur</Text>
+                <View style={styles.aboutDevCard}>
+                  <View style={styles.aboutDevBadge}>
+                    <Text style={styles.aboutDevBadgeText}>YT</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.aboutDevName}>YEFA TECHNOLOGIE</Text>
+                    <Pressable onPress={() => Linking.openURL("mailto:yefa.technologie@gmail.com")}>
+                      <Text style={styles.aboutDevEmail}>yefa.technologie@gmail.com</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+
+              {/* Version & update */}
+              <View style={styles.aboutBlock}>
+                <Text style={styles.aboutBlockTitle}>🔖  Version</Text>
+                <View style={styles.aboutVersionRow}>
+                  <Text style={styles.aboutVersionLabel}>Version installee</Text>
+                  <Text style={styles.aboutVersionValue}>{APP_VERSION}</Text>
+                </View>
+                {updateAvailable ? (
+                  <Pressable
+                    style={styles.aboutUpdateBtn}
+                    onPress={() => Linking.openURL("https://play.google.com/store/apps/details?id=com.yefa.sante")}
+                  >
+                    <Text style={styles.aboutUpdateBtnText}>🚀  Mise a jour v{updateVersion} disponible</Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.aboutUpToDateRow}>
+                    <Text style={styles.aboutUpToDateText}>✓  Application a jour</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Cache */}
               <Pressable
-                style={[styles.aboutUpdateBtn, { backgroundColor: C.amber, opacity: clearingCache ? 0.6 : 1 }]}
-                onPress={async () => {
-                  await handleClearCache();
-                  setShowAbout(false);
-                }}
+                style={[styles.aboutCacheBtn, clearingCache && { opacity: 0.6 }]}
+                onPress={async () => { await handleClearCache(); setShowAbout(false); }}
                 disabled={clearingCache}
               >
-                <Text style={styles.aboutUpdateBtnText}>
-                  {clearingCache ? "Nettoyage en cours..." : "🗑️  Vider le cache local"}
+                <Text style={styles.aboutCacheBtnText}>
+                  {clearingCache ? "Nettoyage..." : "🗑️  Vider le cache local"}
                 </Text>
               </Pressable>
-              <Text style={[styles.helpContact, { marginTop: 8 }]}>
-                Vider le cache libere l'espace disque si l'application est lente ou affiche des erreurs de stockage.
+              <Text style={styles.aboutCacheHint}>
+                A utiliser si l'appli est lente ou affiche des erreurs de stockage.
               </Text>
+
             </ScrollView>
           </View>
         </View>
@@ -644,62 +680,115 @@ export function Root() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 28 }}>
+
+              {/* Intro */}
+              <View style={styles.helpIntro}>
+                <Text style={styles.helpIntroText}>
+                  Trouvez rapidement les reponses a vos questions sur l'utilisation de l'application.
+                </Text>
+              </View>
+
+              {/* Quick tips */}
+              <View style={styles.helpTipsRow}>
+                {[
+                  { icon: "↻",  label: "Bouton ↻\npour actualiser" },
+                  { icon: "☰",  label: "Menu\nen haut a droite" },
+                  { icon: "📡", label: "Hors ligne\nsupporte" },
+                ].map((tip) => (
+                  <View key={tip.label} style={styles.helpTip}>
+                    <Text style={styles.helpTipIcon}>{tip.icon}</Text>
+                    <Text style={styles.helpTipLabel}>{tip.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* FAQ accordeon */}
+              <Text style={styles.helpFaqTitle}>Questions frequentes</Text>
               {[
                 {
+                  icon: "📍",
                   q: "Comment trouver un centre de sante proche ?",
-                  a: "Depuis l'ecran principal, l'application detecte votre position et affiche les centres de sante les plus proches sur la carte. Vous pouvez filtrer par type d'etablissement ou ajuster le rayon de recherche.",
+                  a: "Depuis l'ecran principal, l'application detecte votre position et affiche les centres les plus proches sur la carte interactive. Vous pouvez filtrer par type ou distance.",
                 },
                 {
-                  q: "Comment actualiser les donnees ?",
-                  a: "Faites glisser l'ecran vers le bas (tirer vers le bas) pour actualiser, ou appuyez sur le bouton ↻ en haut a droite de l'application.",
-                },
-                {
+                  icon: "📝",
                   q: "Comment soumettre une plainte ?",
-                  a: "Allez dans la section 'Poser une plainte', selectionnez le centre concerne, decrivez le probleme et soumettez. Vous pouvez suivre l'etat de vos plaintes dans 'Suivi des plaintes'.",
+                  a: "Allez dans 'Poser une plainte', selectionnez le centre concerne, decrivez le probleme et soumettez. Suivez l'etat de vos plaintes dans 'Suivi des plaintes'.",
                 },
                 {
+                  icon: "🚨",
                   q: "Comment signaler une urgence sanitaire ?",
-                  a: "Appuyez sur 'Urgence sanitaire' dans le menu. Remplissez le formulaire avec votre localisation et la description de l'urgence. Le SAMU ou les pompiers seront alertes.",
+                  a: "Appuyez sur 'Urgence sanitaire' dans le menu. Remplissez le formulaire avec votre localisation et la description. Le SAMU ou les pompiers seront alertes immediatement.",
                 },
                 {
+                  icon: "🛡",
                   q: "Comment signaler une urgence securitaire ?",
                   a: "Appuyez sur 'Urgence securitaire'. Decrivez la situation et soumettez. La police ou la gendarmerie recevra l'alerte.",
                 },
                 {
+                  icon: "📡",
                   q: "L'application fonctionne-t-elle sans connexion ?",
-                  a: "Oui. Les actions effectuees hors ligne sont enregistrees localement et synchronisees automatiquement des que la connexion est retablie. Une notification vous informe de l'etat de la synchronisation.",
+                  a: "Oui. Les actions hors ligne sont enregistrees localement et synchronisees automatiquement a la reconnexion. Une notification vous informe de l'etat de la synchronisation.",
                 },
                 {
-                  q: "Comment mettre a jour l'application ?",
-                  a: "Si une mise a jour est disponible, une banniere s'affiche en haut de l'ecran. Appuyez dessus pour acceder a la mise a jour. Vous pouvez aussi verifier dans 'A propos' dans le menu Support.",
-                },
-                {
+                  icon: "🏥",
                   q: "Je suis chef d'etablissement, comment gerer mon centre ?",
-                  a: "Connectez-vous avec votre compte chef. L'application vous redirige automatiquement vers 'Espace chef' ou vous pouvez gerer les informations de votre etablissement, suivre les plaintes et les services.",
+                  a: "Connectez-vous avec votre compte chef. L'appli vous redirige automatiquement vers 'Espace chef' pour gerer les infos, les plaintes et les services de votre etablissement.",
                 },
                 {
-                  q: "Comment contacter le support ?",
-                  a: "Dans le menu (icone hamburger en haut a droite), allez dans 'Support & projet' puis 'Contacter le developpeur'. Vous pouvez aussi ecrire directement a yefa.technologie@gmail.com.",
+                  icon: "🔄",
+                  q: "Comment mettre a jour l'application ?",
+                  a: "Une banniere s'affiche en haut si une mise a jour est disponible. Appuyez dessus pour aller sur le store. Vous pouvez aussi verifier dans 'Support & projet > A propos'.",
                 },
-              ].map((item, i) => (
-                <View key={i} style={styles.faqItem}>
-                  <Text style={styles.faqQuestion}>{item.q}</Text>
-                  <Text style={styles.faqAnswer}>{item.a}</Text>
-                </View>
-              ))}
+                {
+                  icon: "🗑️",
+                  q: "A quoi sert le cache local ?",
+                  a: "Le cache stocke temporairement les donnees pour accelerer l'affichage. Si l'appli est lente ou bloquee, videz le cache depuis 'Support & projet > Vider le cache'.",
+                },
+                {
+                  icon: "🔑",
+                  q: "J'ai oublie mon mot de passe, que faire ?",
+                  a: "Contactez l'administrateur de votre structure (region, district ou etablissement). Il peut reinitialiser votre mot de passe depuis le tableau de bord web.",
+                },
+                {
+                  icon: "📞",
+                  q: "Comment contacter le support technique ?",
+                  a: "Dans le menu hamburger, allez dans 'Support & projet' puis 'Contacter le developpeur'. Vous pouvez aussi ecrire directement a yefa.technologie@gmail.com.",
+                },
+              ].map((item, i) => {
+                const isOpen = openFaqIdx === i;
+                return (
+                  <Pressable
+                    key={i}
+                    style={[styles.faqItem, isOpen && styles.faqItemOpen]}
+                    onPress={() => setOpenFaqIdx(isOpen ? null : i)}
+                  >
+                    <View style={styles.faqRow}>
+                      <Text style={styles.faqItemIcon}>{item.icon}</Text>
+                      <Text style={[styles.faqQuestion, isOpen && styles.faqQuestionOpen]}>{item.q}</Text>
+                      <Text style={[styles.faqArrow, isOpen && styles.faqArrowOpen]}>{isOpen ? "▾" : "›"}</Text>
+                    </View>
+                    {isOpen ? (
+                      <View style={styles.faqAnswerWrap}>
+                        <Text style={styles.faqAnswer}>{item.a}</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
 
-              <View style={styles.aboutDivider} />
-              <Text style={styles.helpContact}>
-                Vous n'avez pas trouve votre reponse ?{"\n"}
-                Contactez-nous a{" "}
-                <Text
-                  style={{ color: C.primary, fontWeight: "700" }}
+              {/* Contact */}
+              <View style={styles.helpContactCard}>
+                <Text style={styles.helpContactTitle}>Pas de reponse a votre question ?</Text>
+                <Pressable
+                  style={styles.helpContactBtn}
                   onPress={() => Linking.openURL("mailto:yefa.technologie@gmail.com")}
                 >
-                  yefa.technologie@gmail.com
-                </Text>
-              </Text>
+                  <Text style={styles.helpContactBtnText}>📧  Contacter le support</Text>
+                </Pressable>
+              </View>
+
             </ScrollView>
           </View>
         </View>
@@ -932,41 +1021,200 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 20, fontWeight: "800", color: C.textDark },
 
-  // About
-  aboutLogoWrap:   { alignItems: "center", marginBottom: 12 },
-  aboutLogo:       { width: 80, height: 80, borderRadius: 20 },
-  aboutAppName:    { fontSize: 18, fontWeight: "800", color: C.textDark, textAlign: "center" },
-  aboutVersion:    { fontSize: 13, color: C.textMuted, fontWeight: "600", textAlign: "center", marginTop: 4, marginBottom: 4 },
+  // About — hero
+  aboutHero: {
+    alignItems: "center",
+    backgroundColor: C.primaryDark,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+  },
+  aboutHeroLogoWrap: {
+    width: 80, height: 80,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  aboutHeroLogo:    { width: 58, height: 58 },
+  aboutHeroName:    { fontSize: 20, fontWeight: "900", color: "#FFFFFF", textAlign: "center", lineHeight: 27 },
+  aboutVersionBadge: {
+    marginTop: 10,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  aboutVersionBadgeText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
+  aboutHeroTagline: { marginTop: 10, color: "rgba(255,255,255,0.75)", fontSize: 13, textAlign: "center", lineHeight: 19 },
+
+  // About chips
+  aboutChipsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginBottom: 16 },
+  aboutChip: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: C.surfaceAlt,
+    borderWidth: 1, borderColor: C.border,
+    borderRadius: 999,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  aboutChipIcon:  { fontSize: 14 },
+  aboutChipLabel: { fontSize: 12, fontWeight: "700", color: C.textMed },
+
+  // About blocks
+  aboutBlock: {
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 14,
+    marginBottom: 12,
+  },
+  aboutBlockTitle: { fontSize: 13, fontWeight: "800", color: C.textDark, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  aboutBlockText:  { fontSize: 13.5, color: C.textMed, lineHeight: 21 },
+
+  // About features grid
+  aboutFeatGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  aboutFeatCard: {
+    width: "48%",
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 12,
+    alignItems: "flex-start",
+    gap: 3,
+  },
+  aboutFeatIcon:  { fontSize: 22, marginBottom: 4 },
+  aboutFeatLabel: { fontSize: 13, fontWeight: "800", color: C.textDark },
+  aboutFeatSub:   { fontSize: 11, color: C.textMuted },
+
+  // About developer card
+  aboutDevCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    padding: 12,
+  },
+  aboutDevBadge: {
+    width: 46, height: 46,
+    borderRadius: 14,
+    backgroundColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aboutDevBadgeText: { color: "#FFFFFF", fontWeight: "900", fontSize: 16 },
+  aboutDevName:  { fontSize: 14, fontWeight: "800", color: C.textDark },
+  aboutDevEmail: { fontSize: 13, color: C.primary, fontWeight: "700", marginTop: 3 },
+
+  // About version
   aboutDivider:    { height: 1, backgroundColor: C.border, marginVertical: 16 },
-  aboutSectionTitle: { fontSize: 13, fontWeight: "800", color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 },
-  aboutText:       { fontSize: 14, color: C.textMed, lineHeight: 22 },
-  aboutFeatureRow: { flexDirection: "row", gap: 8, marginBottom: 6 },
-  aboutFeatureDot: { color: C.primary, fontWeight: "900", fontSize: 16, lineHeight: 22 },
-  aboutFeatureText:{ fontSize: 14, color: C.textMed, flex: 1, lineHeight: 22 },
   aboutVersionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  aboutVersionLabel: { fontSize: 14, color: C.textMuted, fontWeight: "600" },
-  aboutVersionValue: { fontSize: 14, color: C.textDark, fontWeight: "700" },
+  aboutVersionLabel: { fontSize: 13, color: C.textMuted, fontWeight: "600" },
+  aboutVersionValue: { fontSize: 13, color: C.textDark, fontWeight: "800" },
   aboutUpdateBtn: {
     backgroundColor: C.primary,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 13,
     alignItems: "center",
     ...S.sm,
   },
   aboutUpdateBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
-  aboutUpToDate: { color: C.green, fontWeight: "700", fontSize: 14, textAlign: "center", paddingVertical: 10 },
+  aboutUpToDateRow: { alignItems: "center", paddingVertical: 8 },
+  aboutUpToDateText: { color: C.green, fontWeight: "700", fontSize: 14 },
 
-  // Help / FAQ
+  // About cache
+  aboutCacheBtn: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F59E0B50",
+    marginBottom: 6,
+    ...S.sm,
+  },
+  aboutCacheBtnText: { color: "#92400E", fontWeight: "800", fontSize: 14 },
+  aboutCacheHint: { fontSize: 12, color: C.textMuted, textAlign: "center", lineHeight: 18 },
+
+  // Help
+  helpIntro: {
+    backgroundColor: C.primaryLight,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: C.primary + "30",
+  },
+  helpIntroText: { fontSize: 13, color: C.primaryDark, lineHeight: 20, fontWeight: "600", textAlign: "center" },
+  helpTipsRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  helpTip: {
+    flex: 1,
+    backgroundColor: C.surfaceAlt,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    gap: 5,
+  },
+  helpTipIcon:  { fontSize: 20 },
+  helpTipLabel: { fontSize: 11, fontWeight: "700", color: C.textMed, textAlign: "center", lineHeight: 16 },
+  helpFaqTitle: { fontSize: 13, fontWeight: "800", color: C.textMuted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 },
+
+  // FAQ accordion
   faqItem: {
     backgroundColor: C.surfaceAlt,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.border,
-    padding: 14,
-    marginBottom: 10,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  faqItemOpen: {
+    borderColor: C.primary + "60",
+    backgroundColor: C.primaryLight,
+  },
+  faqRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 13 },
+  faqItemIcon:  { fontSize: 18, flexShrink: 0 },
+  faqQuestion:  { flex: 1, fontSize: 13.5, fontWeight: "700", color: C.textDark, lineHeight: 19 },
+  faqQuestionOpen: { color: C.primaryDark },
+  faqArrow:     { fontSize: 18, color: C.textMuted, fontWeight: "700" },
+  faqArrowOpen: { color: C.primary },
+  faqAnswerWrap: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderTopColor: C.primary + "25",
+  },
+  faqAnswer: { fontSize: 13, color: C.textMed, lineHeight: 21, marginTop: 10 },
+
+  // Help contact card
+  helpContactCard: {
+    marginTop: 14,
+    backgroundColor: C.primaryDark,
+    borderRadius: 16,
+    padding: 18,
+    alignItems: "center",
+    gap: 12,
+  },
+  helpContactTitle: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontWeight: "700", textAlign: "center" },
+  helpContactBtn: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
     ...S.sm,
   },
-  faqQuestion: { fontSize: 14, fontWeight: "800", color: C.textDark, marginBottom: 6 },
-  faqAnswer:   { fontSize: 13, color: C.textMed, lineHeight: 20 },
+  helpContactBtnText: { color: C.primaryDark, fontWeight: "800", fontSize: 14 },
   helpContact: { fontSize: 13, color: C.textMuted, textAlign: "center", lineHeight: 22 },
 });
