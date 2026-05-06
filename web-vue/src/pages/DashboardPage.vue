@@ -42,6 +42,8 @@
     <AnalyticsSection
       v-if="store.tab === 'analytics' && (store.isDeveloper || store.isRegulator)"
     />
+    <HelpSection  v-if="store.tab === 'help'" />
+    <AboutSection v-if="store.tab === 'about'" />
   </main>
 </template>
 
@@ -63,6 +65,8 @@ import RolesSection from "../components/dashboard/RolesSection.vue";
 import SecurityAlertSection from "../components/dashboard/SecurityAlertSection.vue";
 import SettingsSection from "../components/dashboard/SettingsSection.vue";
 import AnalyticsSection from "../components/dashboard/AnalyticsSection.vue";
+import HelpSection from "../components/dashboard/HelpSection.vue";
+import AboutSection from "../components/dashboard/AboutSection.vue";
 
 const isSamu = computed(() => store.authRoles.includes("SAMU"));
 const isSapeurPompier = computed(() =>

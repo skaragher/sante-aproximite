@@ -144,14 +144,18 @@ const menuItems = computed(() => {
     pushItem({ tab: "imports",          label: "Importations",          icon: "📥", section: "GOUVERNANCE",      decor: "⚙" });
     pushItem({ tab: "roles",            label: "Gestion des rôles",     icon: "🛡", section: "GOUVERNANCE",      decor: "⚙" });
     pushItem({ tab: "analytics",        label: "Statistiques",          icon: "📈", section: "ANALYTIQUE",       decor: "📊" });
+    pushItem({ tab: "help",             label: "Aide",                  icon: "❓", section: "SUPPORT & PROJET", decor: "💬" });
+    pushItem({ tab: "about",            label: "À propos",              icon: "ℹ",  section: "SUPPORT & PROJET", decor: "💬" });
     return items;
   }
 
   if (hasAnyRole([...etablissementRoles])) {
-    pushItem({ tab: "my-center", label: "Mon centre", icon: "🏥", section: "SUIVI SANITAIRE", decor: "🩺" });
-    pushItem({ tab: "complaints", label: "Plaintes & Satisfaction", icon: "⭐", section: "SUIVI SANITAIRE", decor: "🩺" });
-    pushItem({ tab: "evaluations", label: "Evaluations", icon: "📊", section: "SUIVI SANITAIRE", decor: "🩺" });
-    pushItem({ tab: "settings", label: "Utilisateurs", icon: "👥", section: "GOUVERNANCE", decor: "⚙" });
+    pushItem({ tab: "my-center",  label: "Mon centre",             icon: "🏥", section: "SUIVI SANITAIRE",  decor: "🩺" });
+    pushItem({ tab: "complaints", label: "Plaintes & Satisfaction", icon: "⭐", section: "SUIVI SANITAIRE",  decor: "🩺" });
+    pushItem({ tab: "evaluations",label: "Evaluations",             icon: "📊", section: "SUIVI SANITAIRE",  decor: "🩺" });
+    pushItem({ tab: "settings",   label: "Utilisateurs",            icon: "👥", section: "GOUVERNANCE",      decor: "⚙" });
+    pushItem({ tab: "help",       label: "Aide",                    icon: "❓", section: "SUPPORT & PROJET", decor: "💬" });
+    pushItem({ tab: "about",      label: "À propos",                icon: "ℹ",  section: "SUPPORT & PROJET", decor: "💬" });
     return items;
   }
 
@@ -169,15 +173,18 @@ const menuItems = computed(() => {
   }
 
   if (hasAnyRole([...adminRoles])) {
-    pushItem({ tab: "complaints", label: "Gestion des Plaintes", icon: "📝", section: "QUALITE", decor: "📈" });
-    pushItem({ tab: "evaluations", label: "Evaluations", icon: "📊", section: "QUALITE", decor: "📈" });
-    pushItem({ tab: "settings", label: "Parametres", icon: "⚙", section: "GOUVERNANCE", decor: "👥" });
-    pushItem({ tab: "imports", label: "Importations", icon: "📥", section: "GOUVERNANCE", decor: "👥" });
+    pushItem({ tab: "complaints", label: "Gestion des Plaintes", icon: "📝", section: "QUALITE",          decor: "📈" });
+    pushItem({ tab: "evaluations",label: "Evaluations",           icon: "📊", section: "QUALITE",          decor: "📈" });
+    pushItem({ tab: "settings",   label: "Parametres",            icon: "⚙",  section: "GOUVERNANCE",      decor: "👥" });
+    pushItem({ tab: "imports",    label: "Importations",          icon: "📥", section: "GOUVERNANCE",      decor: "👥" });
     if (hasAnyRole(["NATIONAL", "REGULATOR"])) {
-      pushItem({ tab: "roles", label: "Gestion des roles", icon: "🛡", section: "GOUVERNANCE", decor: "👥" });
+      pushItem({ tab: "roles",    label: "Gestion des roles",     icon: "🛡", section: "GOUVERNANCE",      decor: "👥" });
     }
-    pushItem({ tab: "analytics", label: "Statistiques", icon: "📈", section: "ANALYTIQUE", decor: "📊" });
+    pushItem({ tab: "analytics",  label: "Statistiques",          icon: "📈", section: "ANALYTIQUE",       decor: "📊" });
   }
+
+  pushItem({ tab: "help",  label: "Aide",      icon: "❓", section: "SUPPORT & PROJET", decor: "💬" });
+  pushItem({ tab: "about", label: "À propos",  icon: "ℹ",  section: "SUPPORT & PROJET", decor: "💬" });
 
   return items;
 });
