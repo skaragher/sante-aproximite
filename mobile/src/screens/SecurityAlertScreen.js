@@ -2,7 +2,7 @@ import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { apiFetch } from "../api/client";
+import { apiFetch, trackEvent } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { C, R, S, shared } from "../theme";
 
@@ -163,6 +163,11 @@ export function SecurityAlertScreen() {
         }
       });
       setSuccess(result?.queued ? result.message || "Enregistree hors ligne." : "Alerte envoyee avec succes.");
+      trackEvent("security_alert", "send_security", {
+        targetService,
+        alertType,
+        queued: !!result?.queued,
+      });
       setTargetService(""); setAlertType(""); setLocationName(""); setDescription(""); setPhoneNumber(""); setCoords(null); setPhotos([]);
       await loadMyAlerts();
       setTab("history");

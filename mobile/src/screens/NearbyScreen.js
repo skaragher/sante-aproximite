@@ -2,7 +2,7 @@ import * as Location from "expo-location";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
-import { apiFetch } from "../api/client";
+import { apiFetch, trackEvent } from "../api/client";
 import {
   getCenterCatalogMeta,
   loadCenterCatalog,
@@ -326,6 +326,11 @@ export function NearbyScreen() {
       await updateCachedCenter(token, centerId, {
         myRating: rating || null,
         mySatisfaction: satisfaction || null,
+      });
+      trackEvent("nearby", "rate_center", {
+        centerId,
+        rating: rating || null,
+        satisfaction: satisfaction || null,
       });
       syncCenterCatalog(token).catch(() => {});
       if (coords) await fetchNearby(coords, { silent: true });

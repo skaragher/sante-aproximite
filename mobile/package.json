@@ -4,8 +4,11 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "prestart": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$p=(Get-NetTCPConnection -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1); if ($p) { Stop-Process -Id $p -Force }\"",
-    "start": "set CI=1&& expo start --lan --port 8082",
+    "prestart": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$p=(Get-NetTCPConnection -LocalPort 8081 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -First 1); if ($p) { Stop-Process -Id $p -Force }\"",
+    "start": "set CI=1&& expo start --lan --port 8081",
+    "start:clear": "set CI=1&& expo start --lan --port 8081 --clear",
+    "start:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CI='1'; $env:NGROK_AUTHTOKEN=((Get-Content '.env' | Where-Object { $_ -match '^NGROK_AUTHTOKEN=' } | Select-Object -First 1) -replace '^NGROK_AUTHTOKEN=','').Trim(); expo start --tunnel --port 8081\"",
+    "start:tunnel:clear": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$env:CI='1'; $env:NGROK_AUTHTOKEN=((Get-Content '.env' | Where-Object { $_ -match '^NGROK_AUTHTOKEN=' } | Select-Object -First 1) -replace '^NGROK_AUTHTOKEN=','').Trim(); expo start --tunnel --port 8081 --clear\"",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
@@ -28,6 +31,7 @@
     "@babel/core": "^7.29.0",
     "@expo/ngrok": "^4.1.3",
     "@react-native-community/cli-server-api": "^20.1.2",
-    "babel-preset-expo": "^54.0.0"
+    "babel-preset-expo": "^54.0.0",
+    "react-refresh": "^0.18.0"
   }
 }

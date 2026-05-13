@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { apiFetch, getPendingRequests } from "../api/client";
+import { apiFetch, getPendingRequests, trackEvent } from "../api/client";
 import { loadCenterCatalog, syncCenterCatalog } from "../storage/centerCatalog";
 import { useAuth } from "../context/AuthContext";
 import { C, R, S, shared } from "../theme";
@@ -144,6 +144,11 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
         const mine = await apiFetch("/complaints/mine", { token });
         setMyComplaints(mine);
       }
+      trackEvent("complaints", "submit", {
+        queued: !!result?.queued,
+        withCenter: needsCenter,
+        centerId: needsCenter ? selectedCenter?._id ?? null : null,
+      });
       setSubject("");
       setMessage("");
       if (needsCenter) { setSelectedCenter(null); setSearch(""); }
@@ -164,6 +169,7 @@ export function ComplaintScreen({ defaultHistoryTab = "ACTIVE", hideForm = false
         method: "POST",
         body: { status }
       });
+      trackEvent("complaints_tracking", "submit_feedback", { complaintId, status });
       setSuccess("Validation enregistree");
       const mine = await apiFetch("/complaints/mine", { token });
       setMyComplaints(mine);

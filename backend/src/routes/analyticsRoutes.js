@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { verifyToken } from "../services/authService.js";
 import { requireAuth, requireRole } from "../middlewares/authMiddleware.js";
-import { logEvent, getSummary } from "../controllers/analyticsController.js";
+import { logEvent, getSummary, getUserActions } from "../controllers/analyticsController.js";
 
 const router = Router();
 
@@ -23,5 +23,8 @@ router.post("/event", optionalAuth, logEvent);
 
 // Stats — DEVELOPER, NATIONAL, REGULATOR only
 router.get("/summary", requireAuth, requireRole(["DEVELOPER", "NATIONAL", "REGULATOR"]), getSummary);
+
+// Actions détaillées d'un utilisateur
+router.get("/user/:userId", requireAuth, requireRole(["DEVELOPER", "NATIONAL", "REGULATOR"]), getUserActions);
 
 export default router;

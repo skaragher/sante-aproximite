@@ -3,7 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { apiFetch } from "../api/client";
+import { apiFetch, trackEvent } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { C, R, S, shared } from "../theme";
 
@@ -153,6 +153,11 @@ export function EmergencyScreen() {
         const reportId = result?.report?.id ? ` #${result.report.id}` : "";
         setSuccess(`Signalement envoye${reportId}.`);
       }
+      trackEvent("emergency", "send_emergency", {
+        targetService,
+        emergencyType: emergencyType.trim(),
+        queued: !!result?.queued,
+      });
       setPickupPointName("");
       setDescription("");
       setPhotos([]);

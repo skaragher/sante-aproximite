@@ -1,5 +1,70 @@
 import { pool } from "../config/db.js";
 
+export async function getUserActions(req, res) {
+  const userId = Number(req.params.userId);
+  if (!userId) return res.status(400).json({ message: "userId invalide" });
+
+  const [events, complaints, emergencies, securityAlerts] = await Promise.all([
+    pool.query(
+      `SELECT module, action, metadata, created_at
+       FROM analytics_events
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT id, subject, status, created_at
+       FROM center_complaints
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT id, target_service, status, created_at
+       FROM emergency_reports
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT id, target_service, alert_type, status, created_at
+       FROM security_alerts
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    ),
+  ]);
+
+  res.json({
+    events: events.rows.map((r) => ({
+      module: r.module,
+      action: r.action,
+      metadata: r.metadata,
+      createdAt: r.created_at,
+    })),
+    complaints: complaints.rows.map((r) => ({
+      id: r.id,
+      subject: r.subject,
+      status: r.status,
+      createdAt: r.created_at,
+    })),
+    emergencies: emergencies.rows.map((r) => ({
+      id: r.id,
+      service: r.target_service,
+      status: r.status,
+      createdAt: r.created_at,
+    })),
+    securityAlerts: securityAlerts.rows.map((r) => ({
+      id: r.id,
+      service: r.target_service,
+      type: r.alert_type,
+      status: r.status,
+      createdAt: r.created_at,
+    })),
+  });
+}
+
 export async function logEvent(req, res) {
   const { module, action, metadata } = req.body || {};
   if (!module || !action) {

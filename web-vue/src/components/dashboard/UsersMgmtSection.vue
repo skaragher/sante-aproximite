@@ -154,6 +154,7 @@
                       {{ user.isActive ? '🚫 Désactiver' : '✅ Activer' }}
                     </button>
                     <button v-if="canManageRights" class="um-drop-btn um-drop-rights" @click="openRights(user); expandedUserId = null">🛡 Gérer les droits</button>
+                    <button v-if="canViewActions" class="um-drop-btn um-drop-actions" @click="openUserActions(user); expandedUserId = null">📋 Voir les actions</button>
                     <button class="um-drop-btn um-drop-del" @click="askDelete(user); expandedUserId = null">🗑 Supprimer</button>
                   </template>
                 </div>
@@ -270,6 +271,108 @@
               <button type="button" class="um-btn" @click="editMode = false">Annuler</button>
             </div>
           </form>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ═══ Modal actions utilisateur ═══ -->
+    <Teleport to="body">
+      <div v-if="actionsUser" class="um-overlay" @click.self="actionsUser = null">
+        <div class="um-modal um-modal-xl">
+          <div class="um-actions-modal-header">
+            <div>
+              <h3 class="um-modal-h">📋 Actions - {{ actionsUser.fullName }}</h3>
+              <p class="um-modal-sub">{{ actionsUser.email }}</p>
+            </div>
+            <button class="um-close-btn" @click="actionsUser = null">✕</button>
+          </div>
+
+          <div v-if="actionsLoading" class="um-actions-loading">Chargement...</div>
+
+          <template v-else-if="actionsData">
+            <!-- Résumé -->
+            <div class="um-actions-summary">
+              <div class="um-actions-stat">
+                <span class="um-actions-stat-val">{{ actionsData.events.length }}</span>
+                <span class="um-actions-stat-lbl">Événements app</span>
+              </div>
+              <div class="um-actions-stat">
+                <span class="um-actions-stat-val">{{ actionsData.complaints.length }}</span>
+                <span class="um-actions-stat-lbl">Plaintes</span>
+              </div>
+              <div class="um-actions-stat">
+                <span class="um-actions-stat-val">{{ actionsData.emergencies.length }}</span>
+                <span class="um-actions-stat-lbl">Urgences</span>
+              </div>
+              <div class="um-actions-stat">
+                <span class="um-actions-stat-val">{{ actionsData.securityAlerts.length }}</span>
+                <span class="um-actions-stat-lbl">Alertes sécu.</span>
+              </div>
+            </div>
+
+            <!-- Onglets détail -->
+            <div class="um-actions-tabs">
+              <button
+                v-for="tab in actionsTabs"
+                :key="tab.key"
+                class="um-actions-tab"
+                :class="{ 'um-actions-tab--active': actionsTab === tab.key }"
+                @click="actionsTab = tab.key"
+              >{{ tab.label }} <span class="um-actions-tab-count">{{ tab.count }}</span></button>
+            </div>
+
+            <!-- Événements -->
+            <div v-if="actionsTab === 'events'" class="um-actions-list">
+              <div v-if="!actionsData.events.length" class="um-actions-empty">Aucun événement enregistré.</div>
+              <div v-for="(ev, i) in actionsData.events" :key="i" class="um-actions-row">
+                <div class="um-actions-row-left">
+                  <span class="um-actions-module">{{ ev.module }}</span>
+                  <span class="um-actions-action">{{ ev.action }}</span>
+                </div>
+                <span class="um-actions-time">{{ formatDate(ev.createdAt) }}</span>
+              </div>
+            </div>
+
+            <!-- Plaintes -->
+            <div v-if="actionsTab === 'complaints'" class="um-actions-list">
+              <div v-if="!actionsData.complaints.length" class="um-actions-empty">Aucune plainte soumise.</div>
+              <div v-for="c in actionsData.complaints" :key="c.id" class="um-actions-row">
+                <div class="um-actions-row-left">
+                  <span class="um-actions-subject">{{ c.subject || '(sans sujet)' }}</span>
+                  <span class="um-actions-status-badge" :class="'um-st-' + c.status">{{ c.status }}</span>
+                </div>
+                <span class="um-actions-time">{{ formatDate(c.createdAt) }}</span>
+              </div>
+            </div>
+
+            <!-- Urgences -->
+            <div v-if="actionsTab === 'emergencies'" class="um-actions-list">
+              <div v-if="!actionsData.emergencies.length" class="um-actions-empty">Aucun rapport d'urgence soumis.</div>
+              <div v-for="e in actionsData.emergencies" :key="e.id" class="um-actions-row">
+                <div class="um-actions-row-left">
+                  <span class="um-actions-subject">{{ e.service || 'Service inconnu' }}</span>
+                  <span class="um-actions-status-badge" :class="'um-st-' + e.status">{{ e.status }}</span>
+                </div>
+                <span class="um-actions-time">{{ formatDate(e.createdAt) }}</span>
+              </div>
+            </div>
+
+            <!-- Alertes sécurité -->
+            <div v-if="actionsTab === 'security'" class="um-actions-list">
+              <div v-if="!actionsData.securityAlerts.length" class="um-actions-empty">Aucune alerte de sécurité soumise.</div>
+              <div v-for="a in actionsData.securityAlerts" :key="a.id" class="um-actions-row">
+                <div class="um-actions-row-left">
+                  <span class="um-actions-subject">{{ a.type || a.service || 'Alerte' }}</span>
+                  <span class="um-actions-status-badge" :class="'um-st-' + a.status">{{ a.status }}</span>
+                </div>
+                <span class="um-actions-time">{{ formatDate(a.createdAt) }}</span>
+              </div>
+            </div>
+          </template>
+
+          <div class="um-modal-foot">
+            <button class="um-btn" @click="actionsUser = null">Fermer</button>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -598,6 +701,43 @@ async function submitEdit() {
   }
 }
 
+// ─── Actions utilisateur ──────────────────────────────────────────────────────
+const actionsUser = ref(null);
+const actionsData = ref(null);
+const actionsLoading = ref(false);
+const actionsTab = ref("events");
+
+const canViewActions = computed(() => ["DEVELOPER", "NATIONAL", "REGULATOR"].includes(myLevel.value));
+
+const actionsTabs = computed(() => [
+  { key: "events",      label: "Événements",    count: actionsData.value?.events.length ?? 0 },
+  { key: "complaints",  label: "Plaintes",      count: actionsData.value?.complaints.length ?? 0 },
+  { key: "emergencies", label: "Urgences",      count: actionsData.value?.emergencies.length ?? 0 },
+  { key: "security",    label: "Alertes sécu.", count: actionsData.value?.securityAlerts.length ?? 0 },
+]);
+
+async function openUserActions(user) {
+  actionsUser.value = user;
+  actionsTab.value = "events";
+  actionsData.value = null;
+  actionsLoading.value = true;
+  try {
+    actionsData.value = await apiFetch(`/analytics/user/${user.id}`, { token: auth.state.token });
+  } catch (err) {
+    showErr(err.message);
+    actionsUser.value = null;
+  } finally {
+    actionsLoading.value = false;
+  }
+}
+
+function formatDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
 onMounted(async () => {
   if (store.users.length === 0) await store.fetchUsers();
   if (store.regions.length === 0) await store.fetchRegions();
@@ -910,6 +1050,85 @@ onMounted(async () => {
 }
 .um-form-row input:focus,
 .um-form-row select:focus { border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(147,197,253,.25); }
+
+/* Actions dropdown button */
+.um-drop-actions { color: #0e7490; }
+.um-drop-actions:hover { background: #ecfeff; }
+
+/* Actions modal */
+.um-modal-xl { max-width: 680px; }
+.um-actions-modal-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 16px;
+}
+.um-close-btn {
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 4px 10px; font-size: 0.9rem; cursor: pointer; color: #64748b;
+  flex-shrink: 0;
+}
+.um-close-btn:hover { background: #e2e8f0; }
+
+.um-actions-loading { text-align: center; padding: 24px; color: #64748b; font-size: 0.88rem; }
+
+.um-actions-summary {
+  display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.um-actions-stat {
+  flex: 1; min-width: 100px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 12px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.um-actions-stat-val { font-size: 1.4rem; font-weight: 800; color: #1e293b; }
+.um-actions-stat-lbl { font-size: 0.7rem; color: #64748b; font-weight: 600; text-align: center; }
+
+.um-actions-tabs {
+  display: flex; gap: 4px; border-bottom: 2px solid #e5e7eb; margin-bottom: 12px;
+}
+.um-actions-tab {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border: none; border-bottom: 2px solid transparent;
+  background: transparent; font-size: 0.82rem; font-weight: 600;
+  color: #6b7280; cursor: pointer; margin-bottom: -2px;
+  border-radius: 6px 6px 0 0; transition: color .15s, border-color .15s;
+}
+.um-actions-tab:hover { color: #111827; background: #f9fafb; }
+.um-actions-tab--active { color: #0e7490; border-bottom-color: #0e7490; background: #ecfeff; }
+.um-actions-tab-count {
+  background: #e5e7eb; color: #374151; border-radius: 999px;
+  padding: 0 6px; font-size: 0.68rem; font-weight: 700;
+}
+.um-actions-tab--active .um-actions-tab-count { background: #cffafe; color: #0e7490; }
+
+.um-actions-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.um-actions-empty { text-align: center; color: #94a3b8; padding: 24px; font-size: 0.85rem; }
+.um-actions-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0;
+  gap: 10px;
+}
+.um-actions-row:hover { background: #f1f5f9; }
+.um-actions-row-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.um-actions-module {
+  background: #dbeafe; color: #1d4ed8; border-radius: 20px;
+  padding: 1px 8px; font-size: 0.68rem; font-weight: 700; white-space: nowrap;
+}
+.um-actions-action { font-size: 0.82rem; color: #1e293b; font-weight: 600; }
+.um-actions-subject { font-size: 0.82rem; color: #1e293b; font-weight: 600; word-break: break-word; }
+.um-actions-time { font-size: 0.72rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
+
+/* Status badges dans la modal */
+.um-actions-status-badge {
+  border-radius: 20px; padding: 1px 8px; font-size: 0.68rem; font-weight: 700; white-space: nowrap;
+}
+.um-st-NEW          { background: #dbeafe; color: #1d4ed8; }
+.um-st-IN_PROGRESS  { background: #fef9c3; color: #854d0e; }
+.um-st-ACKNOWLEDGED { background: #fef9c3; color: #854d0e; }
+.um-st-EN_ROUTE     { background: #ede9fe; color: #6d28d9; }
+.um-st-ON_SITE      { background: #ede9fe; color: #6d28d9; }
+.um-st-RESOLVED     { background: #dcfce7; color: #15803d; }
+.um-st-COMPLETED    { background: #dcfce7; color: #15803d; }
+.um-st-CLOSED       { background: #f1f5f9; color: #475569; }
+.um-st-REJECTED     { background: #fee2e2; color: #b91c1c; }
 
 @media (max-width: 640px) {
   .um-toolbar {
